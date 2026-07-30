@@ -266,39 +266,88 @@
       <div class="hint" style="margin-top:6px">PI is the big number on the same panel. Enter it and
         the Build Plan works out how much budget you have left to the class ceiling.</div>
 
-      <h2 style="margin-top:16px">What's fitted <span class="hint">— you chose these; defaults follow class &amp; event</span></h2>
+      <h2 style="margin-top:16px">What's fitted <span class="hint">— defaults follow class &amp; event</span></h2>
       <div class="row2">
-        <div><label>Gears</label>
-          <select id="gr">
-            <option>4</option><option>5</option><option selected>6</option><option>7</option>
-            <option>8</option><option>9</option><option>10</option>
-          </select></div>
-        <div><label>Tires</label>
+        <div><label>Tire compound</label>
           <select id="tire">
             <option value="stock">Stock</option><option value="street">Street</option>
             <option value="sport" selected>Sport</option><option value="semi">Semi-Slick</option>
             <option value="slick">Race Slick</option><option value="rally">Rally</option>
             <option value="offroad">Off-Road</option><option value="dragt">Drag</option>
           </select></div>
+        <div><label>Aero</label>
+          <select id="aero">
+            <option value="none">None</option>
+            <option value="front">Front only</option>
+            <option value="rear">Rear only</option>
+            <option value="both" selected>Front + Rear</option>
+          </select></div>
       </div>
-      <label>Aero</label>
-      <select id="aero">
-        <option value="none">None</option>
-        <option value="rear">Rear only</option>
-        <option value="both" selected>Front + Rear</option>
+
+      <label>Tire width <span class="hint">— upgrade steps above stock, per axle</span></label>
+      <div class="row2">
+        <div><select id="twf">
+            <option value="0" selected>Front: stock</option>
+            <option value="1">Front: +1 step</option><option value="2">Front: +2</option>
+            <option value="3">Front: +3</option><option value="4">Front: +4</option>
+          </select></div>
+        <div><select id="twr">
+            <option value="0" selected>Rear: stock</option>
+            <option value="1">Rear: +1 step</option><option value="2">Rear: +2</option>
+            <option value="3">Rear: +3</option><option value="4">Rear: +4</option>
+          </select></div>
+      </div>
+
+      <div class="row2" style="margin-top:9px">
+        <div><label>Suspension</label>
+          <select id="susp">
+            <option value="stock">Stock</option>
+            <option value="street">Street</option>
+            <option value="sport">Sport</option>
+            <option value="race" selected>Race</option>
+            <option value="rally">Rally</option>
+            <option value="offroad">Off-road</option>
+          </select></div>
+        <div><label>Anti-roll bars</label>
+          <select id="arb">
+            <option value="stock">Stock</option>
+            <option value="front">Race front only</option>
+            <option value="rear">Race rear only</option>
+            <option value="both" selected>Race both</option>
+          </select></div>
+      </div>
+
+      <div class="row2" style="margin-top:9px">
+        <div><label>Transmission</label>
+          <select id="trans">
+            <option value="stock">Stock / Street</option>
+            <option value="sport" selected>Sport</option>
+            <option value="race">Race</option>
+          </select></div>
+        <div><label>Gears</label>
+          <select id="gr">
+            <option>4</option><option>5</option><option selected>6</option><option>7</option>
+            <option>8</option><option>9</option><option>10</option>
+          </select></div>
+      </div>
+
+      <label>Differential</label>
+      <select id="diff">
+        <option value="stock">Stock &mdash; no diff sliders</option>
+        <option value="street">Street &mdash; accel only</option>
+        <option value="sport">Sport &mdash; accel only</option>
+        <option value="race" selected>Race &mdash; full</option>
+        <option value="rally">Rally &mdash; full</option>
+        <option value="offroad">Off-road &mdash; full</option>
+        <option value="drift">Drift &mdash; full</option>
       </select>
-      <div class="hint" style="margin-top:6px">Gear count = the number in the transmission's
-        name (or count the sliders on the Gearing tab). Compound shows on the Tires tab.</div>
+      <div class="hint" style="margin-top:6px">These gate what the game lets you tune, so anything
+        not fitted comes back blank rather than as a number you cannot enter. Compound and width
+        show on the Tires tab; gear count is the number in the transmission's name.</div>
 
       <details id="extra">
         <summary>Optional &mdash; skip unless you already know these</summary>
         <div class="row2">
-          <div><label>Front tire width</label><input id="twf" type="number" inputmode="decimal" placeholder="265"></div>
-          <div><label>Rear tire width</label><input id="twr" type="number" inputmode="decimal" placeholder="285"></div>
-        </div>
-        <div class="hint" style="margin-top:8px">From the tire upgrade screen. Widths only nudge brake balance a little.</div>
-
-        <div class="row2" style="margin-top:10px">
           <div><label>Tire size</label><input id="tsize" placeholder="275/35R19"></div>
           <div><label>Redline (rpm)</label><input id="rpm" type="number" inputmode="decimal" placeholder="7400"></div>
         </div>
@@ -741,7 +790,7 @@ const hpk=(hp,wt)=>Math.round(hp/wt*1000);   // hp per 1000 lb (compute() has it
 const suspFor=disc=> disc==='rally' ? 'Rally' : disc==='cc' ? 'Off-road' : 'Race';
 
 function compute(i){
-  i.susp = suspFor(i.disc);
+  if(!i.susp) i.susp = suspFor(i.disc);   // fallback for older saved builds
   const d=DISC[i.disc], PI=PI_CEIL[i.cls], W=i.wt, fp=i.fw/100;
 
   /* ---- SPRINGS: K = M(2πf)², absolute lbs/in — no slider range needed ---- */
@@ -791,9 +840,12 @@ function compute(i){
   /* ---- ALIGNMENT ---- */
   const camF=d.camF-(i.fw-50)*0.012, camR=d.camR+(i.fw-50)*0.008;
 
-  /* ---- BRAKES ---- */
-  const wd=(i.twr&&i.twf)?(i.twr-i.twf):0;
-  const bal=cl(i.fw-wd*0.15,44,60);
+  /* ---- BRAKES ----
+     Width is an upgrade step per axle (0 = stock), not a measurement. A wider
+     rear carries more grip, so brake bias moves back off the static weight
+     split — roughly 1.5% per step of difference, capped by the clamp. */
+  const wStep=(isFinite(i.twr)?i.twr:0)-(isFinite(i.twf)?i.twf:0);
+  const bal=cl(i.fw-wStep*1.5,44,60);
 
   /* ---- DIFF ---- */
   /* Accel lock scales with torque and weight (Boston's rule), clamped into a
@@ -815,6 +867,13 @@ function compute(i){
     dfa=cl(ac*0.45,18,35); dfd=Math.min(dec,10);
   } else { dra=ac; drd=dec; }
 
+  /* A stock diff exposes no sliders at all, so there is nothing to output —
+     better to say that plainly than print numbers you cannot enter. Street and
+     Sport diffs give the driven axle but no AWD centre split. */
+  const diffTier=i.diff||'race';
+  if(diffTier==='stock'){ dfa=dfd=dra=drd=dc=null; }
+  else if(diffTier==='street'||diffTier==='sport'){ dfd=drd=dc=null; }   // accel only
+
   /* ---- GEARING ----
      With tire size, redline and top speed we can solve final drive exactly:
      engine rpm = 60 · (v/C) · FD · topGear, so FD = rpm·C·3.6 / (60·kmh·topGear).
@@ -835,9 +894,12 @@ function compute(i){
   }
 
   /* ---- AERO ---- */
+  /* Compute both ends, then let the fitted-parts gate below decide which
+     survive — front splitter and rear wing are separate purchases, so any of
+     the four combinations is possible. */
   let aeF=null,aeR=null;
   if(i.aero!=='none'&&i.disc!=='drag'){
-    aeF=(i.aero==='both')?d.aeF:null;
+    aeF=d.aeF;
     aeR=cl(d.aeF+(i.fw-47)*1.5,20,100);
   }
 
@@ -853,10 +915,55 @@ function compute(i){
   if(['rally','cc'].includes(i.disc)&&i.dt!=='AWD') w.push('<b>Drivetrain:</b> AWD is effectively mandatory for '+DISC[i.disc].n+'.');
   if(i.disc==='drift'&&i.dt!=='RWD') w.push('<b>Drivetrain:</b> Drift builds require RWD.');
 
-  // snap everything to legal in-game increments up front
+  /* Parts the tune needs in order to be enterable at all. These are not style
+     notes — without them the sliders below simply do not exist in the game. */
+  if(i.diff==='stock')
+    w.push('<b>No differential fitted.</b> A stock diff has no tuning sliders, so the differential section below is blank. Fit at least a Sport diff &mdash; on this build it is one of the cheapest handling gains available.');
+  else if(i.diff==='street'||i.diff==='sport')
+    w.push('<b>'+(i.diff==='sport'?'Sport':'Street')+' differential &mdash; acceleration only.</b> Decel lock'+(i.dt==='AWD'?' and the AWD centre split need':' needs')+' a Race diff, so '+(i.dt==='AWD'?'both are':'it is')+' left blank below. Decel is how the car rotates on entry'+(i.dt==='AWD'?', and centre bias is the main rotation lever on AWD':'')+' &mdash; this is worth upgrading before almost anything else.');
+  if(i.susp==='stock')
+    w.push('<b>Stock suspension.</b> No spring rate, ride height, damping or alignment sliders exist &mdash; nearly the whole tune has nowhere to go. Race springs and dampers are the single biggest unlock on the list.');
+  else if(!['race','rally','offroad'].includes(i.susp||'race'))
+    w.push('<b>'+((i.susp||'').charAt(0).toUpperCase()+(i.susp||'').slice(1))+' suspension.</b> Spring rate and ride height are adjustable, but damping and alignment (camber, toe, caster) need race-tier springs and dampers &mdash; those sections are blank below.');
+  if(i.arb==='stock')
+    w.push('<b>Stock anti-roll bars.</b> No bar sliders at all, so the main balance tool is unavailable. Race ARBs cost very little PI for a large amount of tuning leverage.');
+  else if(i.arb==='front'||i.arb==='rear')
+    w.push('<b>Race ARB on the '+i.arb+' only.</b> Balance is set by the <em>difference</em> between the two bars, so one end alone gives you far less control than the pair. The missing end is blank below.');
+  if(i.trans==='stock')
+    w.push('<b>Stock transmission.</b> There is no final drive slider without at least a Sport gearbox, so the gearing figure below cannot be entered yet.');
+  if(i.disc==='drift'&&i.diff!=='drift'&&i.diff!=='race')
+    w.push('<b>Differential for drift:</b> a Drift or Race diff is what allows the near-locked accel the tune calls for.');
+  if(['rally','cc'].includes(i.disc)&&['street','sport'].includes(i.diff))
+    w.push('<b>Differential on loose surfaces:</b> the diff does much of the balance work here, and the centre split needs a Race, Rally or Off-road unit.');
+  if(i.disc==='cc'&&i.twf<2&&i.twr<2)
+    w.push('<b>Tire width:</b> cross-country wants maximum width front and rear &mdash; contact patch is most of what keeps it composed over rough ground.');
+
   const raw={pF,pR,fd,camF,camR,toeF:d.toeF,toeR:d.toeR,cast:d.cast,arF,arR,spF,spR,
              rhF:d.rhF,rhR:d.rhR,reF,reR,buF:reF*0.63,buR:reR*0.63,aeF,aeR,
              bal,pres:100,dfa,dfd,dra,drd,dc};
+
+  /* ---- WHAT THE PARTS ACTUALLY LET YOU TUNE ----
+     A value you cannot enter is worse than no value, so anything the fitted
+     parts don't unlock is blanked here rather than printed. Gating per the one
+     traceable FH6 source (Destructoid's slider guide) plus FH5 carry-over:
+       race/rally/off-road springs -> ride height, spring rate, damping, alignment
+       street/sport springs        -> ride height and spring rate only
+       race ARBs                   -> that end's bar, front and rear gated apart
+       sport/street diff           -> acceleration only, no decel, no centre
+       race+ diff                  -> both axles plus the AWD centre split
+     Anything below is flagged in the warnings so it reads as a missing part
+     rather than a broken app. */
+  const S=i.susp||'race', full=['race','rally','offroad'].includes(S);
+  if(S==='stock'){ ['spF','spR','rhF','rhR'].forEach(k=>raw[k]=null); }
+  if(!full){ ['reF','reR','buF','buR','camF','camR','toeF','toeR','cast'].forEach(k=>raw[k]=null); }
+
+  const A=i.arb||'both';
+  if(A==='stock'||A==='rear') raw.arF=null;
+  if(A==='stock'||A==='front') raw.arR=null;
+
+  if(i.aero==='none'||i.aero==='rear') raw.aeF=null;
+  if(i.aero==='none'||i.aero==='front') raw.aeR=null;
+
   const v={};
   for(const k in raw) v[k]= raw[k]==null ? null : snap(k,raw[k]);
 
@@ -902,6 +1009,11 @@ function vin(k){
   return '<input class="vi'+mod+'" data-k="'+k+'" value="'+fmt(k,v)+'">'+
          (m.u?'<span class="u">'+m.u+'</span>':'');
 }
+/* Rows for values the fitted parts don't unlock: show the section, say plainly
+   that it isn't adjustable, and let the warning above explain which part. */
+const locked=(...keys)=>keys.every(k=>eff(k)==null);
+const lockRow=msg=>[['&mdash;',msg||'Not adjustable']];
+
 function sec(c,t,rows,note,extra){
   return '<div class="sec" style="--c:'+c+'"><h3>'+t+'</h3><div class="body"><div class="kv">'+
     rows.map(r=>'<div class="k">'+r[0]+'</div><div class="v">'+r[1]+'</div>').join('')+
@@ -917,29 +1029,50 @@ function render(){
       : '<b>Verify in-game:</b> warm target 32&ndash;34 psi on the tire-temp telemetry screen. Red/overheating &rarr; raise 0.5. Staying blue &rarr; lower 0.5.'));
 
   R.push(sec('var(--gear)','Gearing',[['Final Drive',vin('fd')]],
+    (i.trans==='stock'
+      ? '<b>No final drive slider on a stock gearbox</b> &mdash; fit at least a Sport transmission before any of this can be entered. The figure below is what to set once you have.<br><br>'
+      : '')+
     (r.fdExact
       ? '<b>Solved from your redline, tire size and top speed</b> &mdash; rpm &times; circumference &divide; (speed &times; top gear), so it should land close first time. Still confirm on track.'
       : '<b>Rough estimate from power-to-weight.</b> Fill in tire size, redline and top speed in the form and this gets solved exactly instead of guessed.')+
     ' Move the final drive slider until the power curve just reaches the edge of the speed graph, then confirm the car just touches the limiter in top gear at the end of the longest straight. Bouncing off the limiter early &rarr; lower final drive. Weak corner exit &rarr; raise it.<br><br><b>Leave individual gear ratios at the race-transmission default</b> (shown for reference). Final drive scales all gears together &mdash; do not respace them.',
     '<div class="gears">'+r.gears.map((g,n)=>'<div class="g"><span>'+(n+1)+(n===0?'st':n===1?'nd':n===2?'rd':'th')+'</span><span>'+g.toFixed(2)+'</span></div>').join('')+'</div>'));
 
-  R.push(sec('var(--align)','Alignment',[
-    ['Camber Front',vin('camF')],['Camber Rear',vin('camR')],
-    ['Toe Front',vin('toeF')],['Toe Rear',vin('toeR')],['Caster',vin('cast')]],
-    'Negative toe = toe-in, positive = toe-out (FH6 notation). <b>Camber check:</b> tires should heat evenly on exit &mdash; outer hotter &rarr; more negative, inner hotter &rarr; toward zero.'));
+  const noAlign=locked('camF','camR','toeF','toeR','cast');
+  R.push(sec('var(--align)','Alignment',
+    noAlign ? lockRow('Needs race springs and dampers') : [
+      ['Camber Front',vin('camF')],['Camber Rear',vin('camR')],
+      ['Toe Front',vin('toeF')],['Toe Rear',vin('toeR')],['Caster',vin('cast')]],
+    noAlign
+      ? 'Camber, toe and caster only appear once race-tier springs and dampers are fitted. Until then the car runs its factory alignment.'
+      : 'Negative toe = toe-in, positive = toe-out (FH6 notation). <b>Camber check:</b> tires should heat evenly on exit &mdash; outer hotter &rarr; more negative, inner hotter &rarr; toward zero.'));
 
-  R.push(sec('var(--arb)','Antiroll Bars',[['Front',vin('arF')],['Rear',vin('arR')]],
-    'Split proportional to axle load (stiffer bar on the heavier axle = neutral roll stiffness), then trimmed toward rotation. <b>Target Mechanical Balance 0.55&ndash;0.65 in-game (0.60 sweet spot).</b> Below 0.55 = understeer, above 0.65 = instability. Soften the end with the problem rather than stiffening the strong end &mdash; roughly &plusmn;0.5 ARB per 1% of balance shift.'));
+  const noARB=locked('arF','arR');
+  R.push(sec('var(--arb)','Antiroll Bars',
+    noARB ? lockRow('Stock bars — no sliders') : [['Front',vin('arF')],['Rear',vin('arR')]],
+    noARB
+      ? 'Race anti-roll bars are what expose these sliders. They are cheap in PI and are the main tool for setting balance, so this is usually the first thing to fix.'
+      : 'Split proportional to axle load (stiffer bar on the heavier axle = neutral roll stiffness), then trimmed toward rotation.'+
+        (eff('arF')==null||eff('arR')==null ? ' <b>Only one bar is fitted</b>, so balance here is half-blind &mdash; the difference between the two is what actually sets it.' :
+        ' <b>If your ARB tab shows a Mechanical Balance stat, target 0.55&ndash;0.65 (0.60 sweet spot)</b> &mdash; below 0.55 understeers, above 0.65 goes unstable. Soften the end with the problem rather than stiffening the strong end, roughly &plusmn;0.5 ARB per 1% of shift.')));
 
-  R.push(sec('var(--spring)','Springs',[
-    ['Spring Front',vin('spF')],['Spring Rear',vin('spR')],
-    ['Ride Height Front',vin('rhF')],['Ride Height Rear',vin('rhR')]],
-    'Rates are absolute values from <b>K = M(2&pi;f)&sup2;</b> at '+r.f.toFixed(2)+' Hz base &mdash; type them straight in, the game clamps to the car\'s range if it\'s narrower. F/R ratio is already set by corner mass, so no weight-distribution correction is needed on top. Ride height is a position in the slider\'s range &mdash; 0% = minimum.<br><br><b>Ride height check:</b> if the Springs telemetry bars hit max (97%+) repeatedly over bumps or curbs, raise 1&ndash;2 clicks. Never close to bottoming &rarr; minimum is correct.'));
+  const noSpring=locked('spF','spR','rhF','rhR');
+  R.push(sec('var(--spring)','Springs',
+    noSpring ? lockRow('Stock suspension — no sliders') : [
+      ['Spring Front',vin('spF')],['Spring Rear',vin('spR')],
+      ['Ride Height Front',vin('rhF')],['Ride Height Rear',vin('rhR')]],
+    noSpring
+      ? 'Nothing here is adjustable on stock suspension. Race springs and dampers unlock spring rate, ride height, damping and alignment in one purchase &mdash; the single biggest tuning unlock there is.'
+      : 'Rates are absolute values from <b>K = M(2&pi;f)&sup2;</b> at '+r.f.toFixed(2)+' Hz base &mdash; type them straight in, the game clamps to the car\'s range if it\'s narrower. F/R ratio is already set by corner mass, so no weight-distribution correction is needed on top. Ride height is a position in the slider\'s range &mdash; 0% = minimum.<br><br><b>Ride height check:</b> if the Springs telemetry bars hit max (97%+) repeatedly over bumps or curbs, raise 1&ndash;2 clicks. Never close to bottoming &rarr; minimum is correct.'));
 
-  R.push(sec('var(--damp)','Damping',[
-    ['Rebound Front',vin('reF')],['Rebound Rear',vin('reR')],
-    ['Bump Front',vin('buF')],['Bump Rear',vin('buR')]],
-    'Scaled from critical damping (2&radic;KM) &mdash; heavier, stiffer-sprung corners need more damper, so values track corner weight like the springs do. Bump held at 0.63 &times; rebound (edit rebound and bump follows; edit bump directly and it stops following). Diving/bouncy &rarr; bump too soft. Skipping or telemetry spikes to 100 &rarr; bump too stiff. Roll oscillation or oversteer on turn-in &rarr; rebound too soft; understeer on turn-in &rarr; too stiff.'));
+  const noDamp=locked('reF','reR','buF','buR');
+  R.push(sec('var(--damp)','Damping',
+    noDamp ? lockRow('Needs race springs and dampers') : [
+      ['Rebound Front',vin('reF')],['Rebound Rear',vin('reR')],
+      ['Bump Front',vin('buF')],['Bump Rear',vin('buR')]],
+    noDamp
+      ? 'Damping sliders arrive with race-tier springs and dampers. Without them the car keeps its factory damping whatever the springs are doing.'
+      : 'Scaled from critical damping (2&radic;KM) &mdash; heavier, stiffer-sprung corners need more damper, so values track corner weight like the springs do. Bump held at 0.63 &times; rebound (edit rebound and bump follows; edit bump directly and it stops following). Diving/bouncy &rarr; bump too soft. Skipping or telemetry spikes to 100 &rarr; bump too stiff. Roll oscillation or oversteer on turn-in &rarr; rebound too soft; understeer on turn-in &rarr; too stiff.'));
 
   if(eff('aeF')!=null||eff('aeR')!=null){
     const rows=[];
@@ -956,17 +1089,26 @@ function render(){
   }
 
   R.push(sec('var(--brake)','Braking',[['Balance',vin('bal')],['Pressure',vin('pres')]],
-    'Derived from front weight distribution'+((i.twf&&i.twr)?' and tire width delta':'')+'. Rear slides on entry &rarr; more front bias. Understeer on turn-in &rarr; nudge toward rear. Drop pressure 5&ndash;10% only if you get lockup.'));
+    'Derived from front weight distribution'+
+    (i.twr!==i.twf ? ', shifted '+(i.twr>i.twf?'rearward':'forward')+' for the '+
+      Math.abs(i.twr-i.twf)+'-step width difference' : '')+
+    '. Rear slides on entry &rarr; more front bias. Understeer on turn-in &rarr; nudge toward rear. Drop pressure 5&ndash;10% only if you get lockup.'));
 
-  const dr=[];
-  if(i.dt==='AWD'){
+  const dr=[]; const noDiff=eff('dfa')==null&&eff('dra')==null;
+  if(noDiff){
+    dr.push(['&mdash;','Not adjustable']);
+  } else if(i.dt==='AWD'){
     dr.push(['Front Accel',vin('dfa')],['Front Decel',vin('dfd')],
-            ['Rear Accel',vin('dra')],['Rear Decel',vin('drd')],['Center',vin('dc')]);
+            ['Rear Accel',vin('dra')],['Rear Decel',vin('drd')]);
+    if(eff('dc')!=null) dr.push(['Center',vin('dc')]);
   } else if(i.dt==='FWD'){ dr.push(['Accel',vin('dfa')],['Decel',vin('dfd')]); }
   else { dr.push(['Accel',vin('dra')],['Decel',vin('drd')]); }
   R.push(sec('var(--diff)','Differential',dr,
-    (i.dt==='AWD'?'<b>Front decel is 0% by design</b> &mdash; high front decel locks the front axle under braking, kills trail-braking and causes entry understeer. Only raise it for a specific problem (front wheelspin under braking, extreme power, very rear-heavy car). Center above 50% = rear bias.<br><br>':'')+
-    'Accel scaled to torque and weight &mdash; higher torque needs less lock for the same rotation, and a lighter car rotates more on the same value. <b>Decel deliberately kept low</b>; raise it only from real handling feedback, never as a stability buffer.'));
+    noDiff
+      ? '<b>Stock differential &mdash; nothing to set.</b> The diff sliders only appear once a Sport diff or better is fitted. It is one of the cheapest handling upgrades on the list; until then this section stays blank.'
+      : (i.dt==='AWD'?'<b>Front decel is 0% by design</b> &mdash; high front decel locks the front axle under braking, kills trail-braking and causes entry understeer. Only raise it for a specific problem (front wheelspin under braking, extreme power, very rear-heavy car). '+
+          (eff('dc')!=null?'Center above 50% = rear bias.':'<b>No centre split on this diff</b> &mdash; that slider needs a Race unit.')+'<br><br>':'')+
+        'Accel scaled to torque and weight &mdash; higher torque needs less lock for the same rotation, and a lighter car rotates more on the same value. <b>Decel deliberately kept low</b>; raise it only from real handling feedback, never as a stability buffer.'));
 
   const nMod=Object.keys(ADJ).length;
   const hd='<div class="panel" style="margin-bottom:9px"><div class="hd">'+
@@ -1151,7 +1293,7 @@ function renderLib(){
     return '<div class="libitem"><div>'+
     '<div class="t">'+carTitle(b)+'</div><div class="s">'+b.cls+' '+b.PI+' &middot; '+DISC[b.disc].n+
     ' &middot; '+b.dt+'<br>'+b.hp+' hp / '+b.tq+' lb-ft &middot; '+b.wt+' lb &middot; '+b.fw+'% F &middot; '+
-    hpk(b.hp,b.wt)+' hp/1000lb<br>'+TIRE_N[b.tire]+' &middot; '+b.gr+'-speed &middot; '+suspFor(b.disc)+' susp</div></div>'+
+    hpk(b.hp,b.wt)+' hp/1000lb<br>'+TIRE_N[b.tire]+' &middot; '+b.gr+'-speed &middot; '+(b.susp||suspFor(b.disc))+' susp</div></div>'+
     '<div class="acts"><button class="ld" data-load="'+id+'">Load</button>'+
     '<button class="dl" data-del="'+id+'">Delete</button></div></div>';
   }).join('');
@@ -1604,16 +1746,22 @@ function sheet(){
 
   /* --- differential: layout depends on drivetrain --- */
   let diffBody;
-  if(i.dt==='AWD'){
+  if(eff('dfa')==null&&eff('dra')==null){
+    diffBody='<div class="diff-axle-row single"><div class="diff-axle-box">'+
+      '<div class="diff-axle-label">Stock differential</div>'+
+      row('Adjustment','None available','dim')+'</div></div>';
+  } else if(i.dt==='AWD'){
     diffBody='<div class="diff-axle-row">'+
       '<div class="diff-axle-box"><div class="diff-axle-label">Front Axle</div>'+
         row('Accel',sv('dfa'))+row('Decel',sv('dfd'),eff('dfd')===0?'val-zero':'')+'</div>'+
       '<div class="diff-axle-box"><div class="diff-axle-label">Rear Axle</div>'+
         row('Accel',sv('dra'))+row('Decel',sv('drd'))+'</div></div>'+
-      '<div class="diff-center"><div>'+
-        '<div class="diff-center-title">Center Balance</div>'+
-        '<div class="diff-center-sub">above 50% = rear bias</div></div>'+
-        '<div class="diff-center-value">'+fmt('dc',eff('dc'))+'%</div></div>';
+      (eff('dc')!=null
+        ? '<div class="diff-center"><div>'+
+          '<div class="diff-center-title">Center Balance</div>'+
+          '<div class="diff-center-sub">above 50% = rear bias</div></div>'+
+          '<div class="diff-center-value">'+fmt('dc',eff('dc'))+'%</div></div>'
+        : '');
   } else {
     const fwd=i.dt==='FWD';
     diffBody='<div class="diff-axle-row single"><div class="diff-axle-box">'+
@@ -1642,7 +1790,7 @@ function sheet(){
   N.push('<p><strong>Tire pressure:</strong> '+(i.disc==='drag'
     ? 'Front sits near the 55 psi cap to cut rolling resistance; rear stays soft for launch traction. If the rear spins through 1st&ndash;2nd, drop another 0.5.'
     : 'Values are cold. Warm target is 32&ndash;34 psi on the tire-temp telemetry screen &mdash; running red, raise 0.5; staying blue, lower 0.5.')+'</p>');
-  N.push('<p><strong>Mechanical balance:</strong> ARBs are split proportional to axle load, then trimmed toward rotation. Target <strong>0.55&ndash;0.65</strong> in-game (0.60 sweet spot). Below 0.55 understeers, above 0.65 goes unstable. Soften the end with the problem rather than stiffening the strong end &mdash; roughly &plusmn;0.5 ARB per 1% of balance shift.</p>');
+  N.push('<p><strong>Anti-roll bars</strong> are split proportional to axle load, then trimmed toward rotation. If the ARB tab shows a <strong>Mechanical Balance</strong> stat, aim for 0.55&ndash;0.65 (0.60 sweet spot) &mdash; below 0.55 understeers, above 0.65 goes unstable. Either way, soften the end with the problem rather than stiffening the strong end, roughly &plusmn;0.5 ARB per 1% of shift.</p>');
   N.push('<p><strong>Spring rates</strong> are absolute values from K = M(2&pi;f)&sup2; at a '+r.f.toFixed(2)+' Hz base &mdash; type them straight in and the game clamps if the car\'s range is narrower. The front/rear ratio is already set by corner mass. <strong>Ride height</strong> is a position in the slider range; if the Springs telemetry bars hit 97%+ repeatedly over bumps or curbs, raise 1&ndash;2 clicks.</p>');
   N.push('<p><strong>Damping</strong> scales from critical damping, so heavier and stiffer-sprung corners get more. Bump is held at 0.63 &times; rebound. Diving or bouncy means bump is too soft; skipping or telemetry spikes to 100 means too stiff.</p>');
   if(i.dt==='AWD') N.push('<p><strong>Front decel is 0% by design.</strong> High front decel locks the front axle under braking, kills trail-braking and causes entry understeer. Only raise it for a specific problem &mdash; front wheelspin under braking, extreme power, or a very rear-heavy car.</p>');
@@ -1742,7 +1890,7 @@ const slug=s=>s.toLowerCase().replace(/[^a-z0-9]+/g,'_').replace(/^_+|_+$/g,'')|
 
 /* ===================== WIRE-UP ===================== */
 const FIELDS=['name','year','cls','disc','wt','fw','hp','tq','dt','pi','gr','tire','aero','twf','twr',
-              'tsize','rpm','vmax'];
+              'susp','arb','trans','diff','tsize','rpm','vmax'];
 let restored=false;
 try{
   const s=JSON.parse(localStorage.getItem('fh6last')||'null');
@@ -1773,7 +1921,7 @@ function autoParts(cls,disc){
   else if(disc==='drift') tire='sport';
   else { tire = ci>=4 ? 'slick' : ci===3 ? 'semi' : 'sport';
          aero = ci>=3 ? 'both' : 'none'; }        // aero earns its PI from A up
-  return {tire,aero};
+  return {tire,aero,susp:disc==='rally'?'rally':disc==='cc'?'offroad':'race'};
 }
 let lastAuto=null;                                  // what we suggested last time
 function applyAutoParts(force){
@@ -1781,6 +1929,8 @@ function applyAutoParts(force){
   const a=autoParts(cls,disc), tEl=document.getElementById('tire'), aEl=document.getElementById('aero');
   if(force||!lastAuto||tEl.value===lastAuto.tire) tEl.value=a.tire;
   if(force||!lastAuto||aEl.value===lastAuto.aero) aEl.value=a.aero;
+  const sEl=document.getElementById('susp');
+  if(force||!lastAuto||sEl.value===lastAuto.susp) sEl.value=a.susp;
   lastAuto=a;
 }
 ['cls','disc'].forEach(id=>document.getElementById(id).addEventListener('change',()=>applyAutoParts()));
@@ -1879,7 +2029,7 @@ function readForm(needStats){
   const n=id=>parseFloat(g(id));
   const i={name:g('name').trim(),year:g('year').trim(),cls:g('cls'),disc:g('disc'),wt:n('wt'),fw:n('fw'),
            hp:n('hp'),tq:n('tq'),dt:g('dt'),pi:n('pi'),gr:parseInt(g('gr')),tire:g('tire'),
-           aero:g('aero'),twf:n('twf'),twr:n('twr'),
+           aero:g('aero'),twf:n('twf'),twr:n('twr'),susp:g('susp'),arb:g('arb'),trans:g('trans'),diff:g('diff'),
            tsize:g('tsize').trim(),rpm:n('rpm'),vmax:n('vmax')};
   const req=needStats ? [['wt','Weight'],['fw','Front %'],['hp','HP'],['tq','Torque']]
                       : [['wt','Weight'],['hp','HP']];
@@ -1934,8 +2084,11 @@ document.getElementById('lib').onclick=()=>{
    the next car's brake balance and "exact" final drive. Class, event and the
    visible dropdowns stay: they're the context you're building in. */
 document.getElementById('newcar').onclick=()=>{
-  ['name','year','wt','fw','hp','tq','pi','twf','twr','tsize','rpm','vmax']
+  ['name','year','wt','fw','hp','tq','pi','tsize','rpm','vmax']
     .forEach(id=>{ document.getElementById(id).value=''; });
+  document.getElementById('twf').value='0'; document.getElementById('twr').value='0';
+  document.getElementById('trans').value='sport'; document.getElementById('diff').value='race';
+  document.getElementById('arb').value='both';
   applyAutoParts(true);
   document.getElementById('save').disabled=true;
   document.getElementById('adjust').style.display='none';
