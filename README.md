@@ -22,6 +22,12 @@ No slider ranges are ever required. Spring rates come from `K = M(2πf)²` as ab
 lb/in — type the number in and the game clamps it if the car's range is narrower. Ride
 height and aero work off discipline targets plus the in-game verification readings.
 
+Final drive is solved exactly when you supply tire size, redline and top speed —
+`FD = rpm × circumference × 3.6 / (target km/h × 60 × top gear)` — and falls back to a
+power-to-weight estimate when you don't. All three are readable off in-game screens;
+none can be inferred from class or weight, since tire diameter varies ±12% and redline
+spans 5,500–9,000+.
+
 **Fine-tuning.** After driving, pick what the car did from a symptom list (understeer on
 turn-in, wheelspin on exit, bottoming out, tires cooking, hits the limiter early — 23 in
 all) and it adjusts only the parameters that symptom implicates, one in-game increment at

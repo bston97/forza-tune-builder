@@ -234,6 +234,15 @@
         <div><label>Rear tire width</label><input id="twr" type="number" placeholder="opt."></div>
       </div>
 
+      <h2 style="margin-top:16px">Gearing <span style="text-transform:none;letter-spacing:0;
+        font-weight:400;color:var(--dim)">— optional, all three for exact final drive</span></h2>
+      <div class="row2">
+        <div><label>Tire size</label><input id="tsize" placeholder="275/35R19"></div>
+        <div><label>Redline (rpm)</label><input id="rpm" type="number" placeholder="7400"></div>
+      </div>
+      <label>Top speed (mph) <span style="text-transform:none;letter-spacing:0;color:var(--dim)">— from the stats screen</span></label>
+      <input id="vmax" type="number" placeholder="191">
+
       <div class="btns">
         <button id="plan" class="alt">Build Plan</button>
         <button id="calc">Calculate</button>
@@ -267,19 +276,19 @@ const PI_CEIL={D:400,C:500,B:600,A:700,S1:800,S2:900,R:998,X:999};
    for that axle's share of the weight). <1 front + >1 rear = rotation trim. */
 const DISC={
  road  :{n:'Road / Circuit', fF:1.00,fR:0.97, zF:.62,zR:.62, aF:0.93,aR:1.05,
-         camF:-2.2,camR:-1.3, toeF:0.0,toeR:-0.1, cast:6.7, rhF:0,rhR:0, fd:3.70, dec:15, aeF:60},
+         camF:-2.2,camR:-1.3, toeF:0.0,toeR:-0.1, cast:6.7, rhF:0,rhR:0, fd:3.70, vFrac:0.95, dec:15, aeF:60},
  sprint:{n:'Sprint / Speed Race', fF:0.98,fR:0.95, zF:.60,zR:.60, aF:0.95,aR:1.02,
-         camF:-2.0,camR:-1.2, toeF:0.0,toeR:-0.1, cast:6.7, rhF:0,rhR:0, fd:3.55, dec:12, aeF:55},
+         camF:-2.0,camR:-1.2, toeF:0.0,toeR:-0.1, cast:6.7, rhF:0,rhR:0, fd:3.55, vFrac:0.97, dec:12, aeF:55},
  touge :{n:'Touge', fF:0.94,fR:0.90, zF:.58,zR:.58, aF:0.88,aR:1.10,
-         camF:-2.4,camR:-1.4, toeF:0.1,toeR:-0.1, cast:6.7, rhF:10,rhR:15, fd:4.20, dec:10, aeF:65},
+         camF:-2.4,camR:-1.4, toeF:0.1,toeR:-0.1, cast:6.7, rhF:10,rhR:15, fd:4.20, vFrac:0.72, dec:10, aeF:65},
  drift :{n:'Drift', fF:0.88,fR:1.12, zF:.55,zR:.65, aF:0.60,aR:1.35,
-         camF:-2.8,camR:-1.0, toeF:0.3,toeR:0.1, cast:7.0, rhF:5,rhR:15, fd:3.50, dec:5, aeF:50},
+         camF:-2.8,camR:-1.0, toeF:0.3,toeR:0.1, cast:7.0, rhF:5,rhR:15, fd:3.50, vFrac:0.90, dec:5, aeF:50},
  drag  :{n:'Drag', fF:1.10,fR:0.88, zF:.60,zR:.50, aF:1.00,aR:0.70,
-         camF:-0.5,camR:-0.2, toeF:0.0,toeR:0.0, cast:5.0, rhF:0,rhR:5, fd:3.30, dec:0, aeF:0},
+         camF:-0.5,camR:-0.2, toeF:0.0,toeR:0.0, cast:5.0, rhF:0,rhR:5, fd:3.30, vFrac:1.00, dec:0, aeF:0},
  rally :{n:'Dirt Rally', fF:0.62,fR:0.60, zF:.68,zR:.68, aF:0.22,aR:0.24,
-         camF:-1.2,camR:-0.8, toeF:0.1,toeR:-0.2, cast:6.0, rhF:75,rhR:75, fd:4.40, dec:12, aeF:50},
+         camF:-1.2,camR:-0.8, toeF:0.1,toeR:-0.2, cast:6.0, rhF:75,rhR:75, fd:4.40, vFrac:0.75, dec:12, aeF:50},
  cc    :{n:'Cross-Country', fF:0.52,fR:0.50, zF:.70,zR:.70, aF:0.15,aR:0.16,
-         camF:-0.8,camR:-0.5, toeF:0.0,toeR:-0.2, cast:6.0, rhF:100,rhR:100, fd:4.80, dec:15, aeF:50}
+         camF:-0.8,camR:-0.5, toeF:0.0,toeR:-0.2, cast:6.0, rhF:100,rhR:100, fd:4.80, vFrac:0.70, dec:15, aeF:50}
 };
 
 const PSI={stock:27,street:27,sport:27.5,semi:31,slick:31.5,rally:25,offroad:24,dragt:28};
@@ -580,6 +589,16 @@ function buildPlan(i){
 const cl=(v,a,b)=>Math.min(b,Math.max(a,v));
 const h5=v=>Math.round(v*2)/2;
 
+/* "275/35R19" -> rolling circumference in metres. Accepts / , R or spaces as
+   separators. Rolling radius = rim radius + sidewall height (width × aspect). */
+function tireCirc(s){
+  const m=String(s||'').match(/(\d{3})\s*[\/\s-]\s*(\d{2})\s*[Rr\/\s-]?\s*(\d{2})/);
+  if(!m) return null;
+  const w=+m[1], aspect=+m[2], rim=+m[3];
+  if(w<100||w>500||aspect<15||aspect>90||rim<10||rim>26) return null;
+  return 2*Math.PI*(rim*25.4/2+w*aspect/100)/1000;
+}
+
 /* format a value for display using its metadata */
 function fmt(k,v){
   if(v==null) return '';
@@ -632,22 +651,30 @@ function compute(i){
   const spF=rate(cm(fp),   f*d.fF);
   const spR=rate(cm(1-fp), f*d.fR);
 
-  /* ---- DAMPING: from critical damping C = 2√(KM) ∝ corner mass × frequency.
-         Since spring K already ∝ M·f², damper need scales as mass × freq — so
-         heavier and stiffer-sprung corners get higher 1-20 values, and the F/R
-         split follows corner weight the same way the springs do. zF/zR act as
-         discipline character multipliers around the 0.62 road norm.
-         Calibrated so a ~3000 lb A-class road car lands near the community
-         (HokiHoshi) baseline of ~10.5 rebound at 50/50. ---- */
+  /* ---- DAMPING (1-20). Built on the community-standard axle-share baseline
+         (HokiHoshi: rebound = 19 × axleShare + 1, so a 50/50 car sits at 10.5),
+         scaled by the discipline's damping ratio against the 0.62 road norm.
+
+         Deliberately only *mildly* weight-sensitive. Critical damping C = 2√(KM)
+         does scale with mass, but the slider is a normalised 0-20 position into
+         a car-specific damper range, not an absolute force — so scaling hard on
+         mass double-counts and pins heavy cars near 20. An earlier revision did
+         exactly that (a 4,800 lb car came out at 19.2 of 20). ---- */
   const off=(i.disc==='rally'||i.disc==='cc')?1.0:0;
-  const damp=(m,fq,z)=>cl(0.0135*m*fq*(z/0.62)+off,1,20);
-  const reF=damp(cm(fp),  f*d.fF, d.zF), reR=damp(cm(1-fp), f*d.fR, d.zR);
+  const wNudge=1+(W-3000)*0.00004;
+  const damp=(share,z)=>cl((19*share+1)*(z/0.62)*wNudge+off,1,20);
+  const reF=damp(fp,d.zF), reR=damp(1-fp,d.zR);
 
   /* ---- ARBs: 1-65. Base split PROPORTIONAL to axle load (community-standard
          HokiHoshi method: stiffer bar on the heavier axle = neutral roll
          stiffness, NOT understeer). Discipline aF/aR then trim toward rotation
-         to land Mechanical Balance in the 0.55-0.65 window. ---- */
-  const ab=24+(W-2500)*0.0045;
+         to land Mechanical Balance in the 0.55-0.65 window.
+
+         Base pivots on a 3,000 lb car sitting at the community baseline of ~33
+         at 50/50, then scales gently with weight (a heavier car carries a larger
+         roll moment on the same bar). The previous anchor only reached 33 around
+         4,500 lb, which left ordinary 2,200-3,500 lb cars 25-35% too soft. ---- */
+  const ab=33+(W-3000)*0.004;
   const arF=ab*2*fp*d.aF, arR=ab*2*(1-fp)*d.aR;
 
   /* ---- TIRE PRESSURE ---- */
@@ -679,9 +706,24 @@ function compute(i){
     dfa=cl(ac*0.75,20,60); dfd=Math.min(dec,10);
   } else { dra=ac; drd=dec; }
 
-  /* ---- GEARING ---- */
-  const pw=i.hp/W*1000;
-  const fd=cl(d.fd*Math.pow(100/pw,0.12)*(1+(i.gr-6)*0.03),2.20,6.00);
+  /* ---- GEARING ----
+     With tire size, redline and top speed we can solve final drive exactly:
+     engine rpm = 60 · (v/C) · FD · topGear, so FD = rpm·C·3.6 / (60·kmh·topGear).
+     Note the top gear ratio genuinely belongs in there — TuneLab, the only
+     open-source Forza calculator doing gearing, drops it and so lands ~15-40%
+     short on any car whose top gear isn't 1.00 (most of them).
+     Without those three inputs, fall back to the old power-to-weight heuristic. */
+  const topGear=SPREAD[i.gr][i.gr-1];
+  const circ=tireCirc(i.tsize);
+  let fd, fdExact=false;
+  if(circ&&isFinite(i.rpm)&&i.rpm>0&&isFinite(i.vmax)&&i.vmax>0){
+    const targetKmh=i.vmax*1.609344*d.vFrac;
+    fd=cl(i.rpm*circ*3.6/(60*targetKmh*topGear),2.20,6.00);
+    fdExact=true;
+  } else {
+    const pw=i.hp/W*1000;
+    fd=cl(d.fd*Math.pow(100/pw,0.12)*(1+(i.gr-6)*0.03),2.20,6.00);
+  }
 
   /* ---- AERO ---- */
   let aeF=null,aeR=null;
@@ -711,7 +753,7 @@ function compute(i){
   const v={};
   for(const k in raw) v[k]= raw[k]==null ? null : snap(k,raw[k]);
 
-  return {i,d,PI,f,w,v,gears:SPREAD[i.gr]};
+  return {i,d,PI,f,w,v,fdExact,gears:SPREAD[i.gr]};
 }
 
 /* ===================== ADJUSTMENT ENGINE ===================== */
@@ -768,7 +810,10 @@ function render(){
       : '<b>Verify in-game:</b> warm target 32&ndash;34 psi on the tire-temp telemetry screen. Red/overheating &rarr; raise 0.5. Staying blue &rarr; lower 0.5.'));
 
   R.push(sec('var(--gear)','Gearing',[['Final Drive',vin('fd')]],
-    '<b>Starting estimate only &mdash; dial in-game.</b> Move the final drive slider until the power curve just reaches the edge of the speed graph, then confirm on track that the car just touches the limiter in top gear at the end of the longest straight. Bouncing off the limiter early &rarr; lower final drive. Weak corner exit &rarr; raise it.<br><br><b>Leave individual gear ratios at the race-transmission default</b> (shown for reference). Final drive scales all gears together &mdash; do not respace them.',
+    (r.fdExact
+      ? '<b>Solved from your redline, tire size and top speed</b> &mdash; rpm &times; circumference &divide; (speed &times; top gear), so it should land close first time. Still confirm on track.'
+      : '<b>Rough estimate from power-to-weight.</b> Fill in tire size, redline and top speed in the form and this gets solved exactly instead of guessed.')+
+    ' Move the final drive slider until the power curve just reaches the edge of the speed graph, then confirm the car just touches the limiter in top gear at the end of the longest straight. Bouncing off the limiter early &rarr; lower final drive. Weak corner exit &rarr; raise it.<br><br><b>Leave individual gear ratios at the race-transmission default</b> (shown for reference). Final drive scales all gears together &mdash; do not respace them.',
     '<div class="gears">'+r.gears.map((g,n)=>'<div class="g"><span>'+(n+1)+(n===0?'st':n===1?'nd':n===2?'rd':'th')+'</span><span>'+g.toFixed(2)+'</span></div>').join('')+'</div>'));
 
   R.push(sec('var(--align)','Alignment',[
@@ -1467,7 +1512,8 @@ adj+
 const slug=s=>s.toLowerCase().replace(/[^a-z0-9]+/g,'_').replace(/^_+|_+$/g,'')||'tune';
 
 /* ===================== WIRE-UP ===================== */
-const FIELDS=['name','cls','disc','wt','fw','hp','tq','dt','gr','tire','susp','aero','asp','twf','twr'];
+const FIELDS=['name','cls','disc','wt','fw','hp','tq','dt','gr','tire','susp','aero','asp','twf','twr',
+              'tsize','rpm','vmax'];
 try{
   const s=JSON.parse(localStorage.getItem('fh6last')||'null');
   if(s) FIELDS.forEach(k=>{ if(s[k]!=null&&s[k]!=='') document.getElementById(k).value=s[k]; });
@@ -1496,7 +1542,8 @@ function readForm(needStats){
   const n=id=>parseFloat(g(id));
   const i={name:g('name').trim(),cls:g('cls'),disc:g('disc'),wt:n('wt'),fw:n('fw'),
            hp:n('hp'),tq:n('tq'),dt:g('dt'),gr:parseInt(g('gr')),tire:g('tire'),
-           susp:g('susp'),aero:g('aero'),asp:g('asp'),twf:n('twf'),twr:n('twr')};
+           susp:g('susp'),aero:g('aero'),asp:g('asp'),twf:n('twf'),twr:n('twr'),
+           tsize:g('tsize').trim(),rpm:n('rpm'),vmax:n('vmax')};
   const req=needStats ? [['wt','Weight'],['fw','Front %'],['hp','HP'],['tq','Torque']]
                       : [['wt','Weight'],['hp','HP']];
   for(const [k,lbl] of req){
