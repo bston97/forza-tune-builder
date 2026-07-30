@@ -1054,7 +1054,7 @@ function render(){
       ? 'Race anti-roll bars are what expose these sliders. They are cheap in PI and are the main tool for setting balance, so this is usually the first thing to fix.'
       : 'Split proportional to axle load (stiffer bar on the heavier axle = neutral roll stiffness), then trimmed toward rotation.'+
         (eff('arF')==null||eff('arR')==null ? ' <b>Only one bar is fitted</b>, so balance here is half-blind &mdash; the difference between the two is what actually sets it.' :
-        ' <b>If your ARB tab shows a Mechanical Balance stat, target 0.55&ndash;0.65 (0.60 sweet spot)</b> &mdash; below 0.55 understeers, above 0.65 goes unstable. Soften the end with the problem rather than stiffening the strong end, roughly &plusmn;0.5 ARB per 1% of shift.')));
+        ' <b>Check Mechanical Balance on this same tab &mdash; target 0.55&ndash;0.65, sweet spot 0.60.</b> Below 0.55 understeers, above 0.65 goes unstable. Adjust before you leave the tab: soften the end with the problem rather than stiffening the strong end, roughly &plusmn;0.5 ARB per 1% of shift.')));
 
   const noSpring=locked('spF','spR','rhF','rhR');
   R.push(sec('var(--spring)','Springs',
@@ -1080,7 +1080,7 @@ function render(){
     if(eff('aeR')!=null)rows.push(['Rear',vin('aeR')]);
     R.push(sec('var(--aero)','Aero',rows,
       i.aero==='both'
-        ? 'Set front to its position, then adjust rear until the in-game <b>Aero Balance reads 0.42&ndash;0.48 (sweet spot 0.45)</b>. The balance reading is the real target &mdash; do not chase absolute lbs.'
+        ? 'Set front to its position, then adjust rear until <b>Aero Balance &mdash; shown on this same tab &mdash; reads 0.42&ndash;0.48, sweet spot 0.45</b>. That reading is the target; the absolute lbs are not. More front = rotation, more rear = stability.'
         : '<b>Rear aero only.</b> With a fixed front, the in-game balance figure is not a reliable target &mdash; trust mechanical balance from diff, ARB and springs instead.'));
   } else {
     R.push(sec('var(--aero)','Aero',[['&mdash;','No aero']],
@@ -1776,7 +1776,7 @@ function sheet(){
                               :row('Front Downforce','Not adjustable','dim'))+
       row('Rear Downforce',sv('aeR'),'val-teal')+
       '<div class="aero-note">'+(aeroBoth
-        ? 'Set front to its position, then adjust rear until in-game <strong>Aero Balance reads 0.42&ndash;0.48 (sweet spot 0.45)</strong>. That reading is the real target &mdash; lbs values are secondary.'
+        ? 'Set front to its position, then adjust rear until <strong>Aero Balance</strong> on the same tab reads <strong>0.42&ndash;0.48</strong>, sweet spot 0.45. That reading is the target; the lbs figures are secondary.'
         : 'Front is fixed, so the in-game balance figure is <strong>not a reliable target</strong> here &mdash; trust mechanical balance from the diff, ARBs and springs instead.')+'</div>';
   } else {
     aeroBody=row('Downforce', i.disc==='drag'?'None &mdash; drag build':'No adjustable aero')+
@@ -1790,7 +1790,7 @@ function sheet(){
   N.push('<p><strong>Tire pressure:</strong> '+(i.disc==='drag'
     ? 'Front sits near the 55 psi cap to cut rolling resistance; rear stays soft for launch traction. If the rear spins through 1st&ndash;2nd, drop another 0.5.'
     : 'Values are cold. Warm target is 32&ndash;34 psi on the tire-temp telemetry screen &mdash; running red, raise 0.5; staying blue, lower 0.5.')+'</p>');
-  N.push('<p><strong>Anti-roll bars</strong> are split proportional to axle load, then trimmed toward rotation. If the ARB tab shows a <strong>Mechanical Balance</strong> stat, aim for 0.55&ndash;0.65 (0.60 sweet spot) &mdash; below 0.55 understeers, above 0.65 goes unstable. Either way, soften the end with the problem rather than stiffening the strong end, roughly &plusmn;0.5 ARB per 1% of shift.</p>');
+  N.push('<p><strong>Anti-roll bars</strong> are split proportional to axle load, then trimmed toward rotation. The ARB tab shows <strong>Mechanical Balance</strong> &mdash; target <strong>0.55&ndash;0.65</strong>, sweet spot 0.60. Below 0.55 understeers, above 0.65 goes unstable. Sort it before leaving the tab: soften the end with the problem rather than stiffening the strong end, roughly &plusmn;0.5 ARB per 1% of shift.</p>');
   N.push('<p><strong>Spring rates</strong> are absolute values from K = M(2&pi;f)&sup2; at a '+r.f.toFixed(2)+' Hz base &mdash; type them straight in and the game clamps if the car\'s range is narrower. The front/rear ratio is already set by corner mass. <strong>Ride height</strong> is a position in the slider range; if the Springs telemetry bars hit 97%+ repeatedly over bumps or curbs, raise 1&ndash;2 clicks.</p>');
   N.push('<p><strong>Damping</strong> scales from critical damping, so heavier and stiffer-sprung corners get more. Bump is held at 0.63 &times; rebound. Diving or bouncy means bump is too soft; skipping or telemetry spikes to 100 means too stiff.</p>');
   if(i.dt==='AWD') N.push('<p><strong>Front decel is 0% by design.</strong> High front decel locks the front axle under braking, kills trail-braking and causes entry understeer. Only raise it for a specific problem &mdash; front wheelspin under braking, extreme power, or a very rear-heavy car.</p>');
