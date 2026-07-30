@@ -40,6 +40,15 @@
   input[type=number]::-webkit-outer-spin-button,
   input[type=number]::-webkit-inner-spin-button{-webkit-appearance:none;margin:0}
   .row2{display:grid;grid-template-columns:1fr 1fr;gap:9px}
+  .rowNY{display:grid;grid-template-columns:2fr 1fr;gap:9px}
+  .cnotes{display:grid;gap:9px}
+  .cn{display:grid;grid-template-columns:104px 1fr;gap:12px;align-items:baseline;
+      font-size:12.5px;line-height:1.55}
+  .cn b{color:var(--align);font-size:11px;text-transform:uppercase;letter-spacing:.7px;
+        font-weight:600}
+  .cn span{color:var(--dim)}
+  .cn span b{color:#c8d2e4;font-size:12.5px;text-transform:none;letter-spacing:0}
+  @media(max-width:900px){.cn{grid-template-columns:1fr;gap:2px}}
   .hint{font-size:11px;color:var(--dim);line-height:1.5;text-transform:none;letter-spacing:0;
         font-weight:400}
   details#extra{margin-top:14px;border-top:1px solid var(--line);padding-top:10px}
@@ -187,8 +196,10 @@
     <!-- ============ INPUT ============ -->
     <div class="panel">
       <h2>Car</h2>
-      <label>Car name</label>
-      <input id="name" placeholder="Lancer Evolution VIII MR">
+      <div class="rowNY">
+        <div><label>Car name</label><input id="name" placeholder="Lancer Evolution VIII MR"></div>
+        <div><label>Year</label><input id="year" type="number" placeholder="2004"></div>
+      </div>
 
       <div class="row2">
         <div><label>Class</label>
@@ -649,7 +660,7 @@ const eff=k=> (ADJ[k]!==undefined ? ADJ[k] : (BASE ? BASE.v[k] : null));
 const LIB_KEY='fh6lib';
 function libLoad(){ try{ return JSON.parse(localStorage.getItem(LIB_KEY)||'[]'); }catch(e){ return []; } }
 function libStore(a){ try{ localStorage.setItem(LIB_KEY,JSON.stringify(a)); }catch(e){} }
-function libKey(i){ return (i.name||'untitled').toLowerCase().trim()+'|'+i.cls+'|'+i.disc; }
+function libKey(i){ return (i.name||'untitled').toLowerCase().trim()+'|'+(i.year||'')+'|'+i.cls+'|'+i.disc; }
 function libAdd(i,PI){
   const a=libLoad(), k=libKey(i);
   const e={k,PI,ts:Date.now()};
@@ -659,6 +670,7 @@ function libAdd(i,PI){
   if(ix>-1) a[ix]=e; else a.push(e);
   libStore(a);
 }
+const carTitle=i=>(i.year?i.year+' ':'')+(i.name||'Untitled');
 const hpk=(hp,wt)=>Math.round(hp/wt*1000);   // hp per 1000 lb (compute() has its own local pw)
 
 /* Suspension follows straight from the discipline, so it's derived rather than
@@ -888,7 +900,7 @@ function render(){
 
   const nMod=Object.keys(ADJ).length;
   const hd='<div class="panel" style="margin-bottom:9px"><div class="hd">'+
-    '<div class="nm">'+(i.name||'Untitled')+'</div>'+
+    '<div class="nm">'+carTitle(i)+'</div>'+
     '<div class="mt">'+i.cls+' '+r.PI+' &middot; '+d.n+' &middot; '+i.dt+' &middot; '+
     i.wt+' lb &middot; '+i.fw+'% F &middot; '+i.hp+' hp / '+i.tq+' lb-ft</div></div>'+
     '<div style="color:var(--dim);font-size:12px">'+TIRE_N[i.tire]+' tires &middot; '+
@@ -903,15 +915,82 @@ function render(){
 /* ===================== PLAN + LIBRARY VIEWS ===================== */
 const TAGTXT={must:'Required',high:'High value',fill:'Fill',opt:'Situational',skip:'Skip'};
 
+/* Character notes derived purely from the stat block. Deliberately NOT car lore —
+   nothing here needs a per-car database, and nothing claims a PI outcome, because
+   PI comes from a simulated lap rather than a formula. It reads the numbers back
+   as handling consequences, which is the part that's actually derivable. */
+const PW_BAND=[[90,'D–C'],[130,'B'],[180,'A'],[240,'S1'],[320,'S2'],[1e9,'R / X']];
+function carNotes(i){
+  const pw=hpk(i.hp,i.wt), tqr=i.tq/i.hp, fw=i.fw, W=i.wt, dt=i.dt, out=[];
+
+  const mass = W<2400?'Light':W<3200?'Mid-weight':W<4000?'Heavy':'Very heavy';
+  const pwT  = pw<100?'modest power':pw<150?'moderate power':pw<220?'strong power'
+             :pw<300?'very strong power':'extreme power';
+  let build = mass+' with '+pwT+' ('+pw+' hp per 1000 lb). ';
+  build += W<2400
+    ? (pw>200?'It will change direction instantly and run out of grip just as fast — resist over-stiffening it.'
+             :'Light enough to carry speed through everything; momentum matters more than outright power.')
+    : W<3200 ? 'A middleweight, so nothing dominates — it will do what the tune tells it to.'
+    : (pw>=150?'Heavy but well powered: strong down the straights, though it needs earlier braking than it feels like it should.'
+              :'Heavy for the power on tap. Brake early, get it turned, and protect exit speed.');
+  out.push(['Character',build]);
+
+  out.push(['Engine', tqr>=1.0
+    ? 'Torque-rich at '+tqr.toFixed(2)+' lb-ft per hp — it pulls from low revs and will overwhelm the driven tyres on exit. That is why the diff accel lock comes out lower here.'
+    : tqr>=0.8
+      ? 'Fairly even torque-to-power at '+tqr.toFixed(2)+' — flexible, no particular vice in the delivery.'
+      : 'Peaky at '+tqr.toFixed(2)+' lb-ft per hp — the power lives at the top, so it needs keeping on the boil. It suits more gears and rewards holding revs rather than short-shifting.']);
+
+  out.push(['Balance', fw<44
+    ? fw+'% front is rear-biased. Rotation comes easily and the fronts stay cool, but it can snap if you add power mid-corner. The ARB split leans on the front here to settle it.'
+    : fw<48 ? fw+'% front — a slight rear bias, close to the ideal window for a road car.'
+    : fw<=52 ? fw+'% front is near neutral. Very little to fight either way.'
+    : fw<=56 ? fw+'% front is nose-heavy, so understeer is the default failure mode. The ARB and diff numbers already lean toward rotation to offset it.'
+    : fw+'% front is strongly nose-heavy. Expect push on entry and again on exit — the front tyres are the limit, and softening the front further is your first lever.']);
+
+  out.push(['Drivetrain', dt==='RWD'
+    ? 'RWD puts rotation on the throttle. Traction off slow corners is the constraint, which is what the accel lock is managing.'
+    : dt==='AWD'
+      ? 'AWD launches and stays planted, but pushes wide by default. The rear-biased centre split and the 0% front decel are both there to buy rotation back.'
+      : 'FWD is traction-limited on exit and pushes under power. Lift-off and trail-braking are the rotation tools; the tune keeps the front diff loose to avoid adding push.']);
+
+  // where this stat profile naturally goes
+  const fit=[];
+  if(dt==='RWD'&&tqr>=0.85&&W<4300) fit.push('drift');
+  if(tqr>=1.0||(dt==='AWD'&&pw>180)) fit.push('drag');
+  if(dt==='AWD') fit.push('dirt rally and cross-country');
+  if(W<3200&&pw>=60&&pw<=300) fit.push('touge and tight circuit');
+  if(pw>=120&&(W<3800||pw>=180)&&fw>=38&&fw<=64) fit.push('road and sprint');
+  out.push(['Naturally suits', fit.length
+    ? fit.join(', ')+'. That is read off the numbers, not the badge — a good tune moves a car a long way outside its comfort zone.'
+    : 'Nothing jumps out from the numbers. It should be workable anywhere with the right build.']);
+
+  const band=PW_BAND.find(b=>pw<b[0])[1];
+  const chosen=i.cls;
+  let cls='At '+pw+' hp per 1000 lb this sits around <b>'+band+'</b> on power-to-weight alone';
+  cls += band.indexOf(chosen)>-1
+    ? ', which lines up with the '+chosen+' you have selected.'
+    : ', while you have targeted <b>'+chosen+'</b>. That is not necessarily wrong — grip, aero and weight all move PI too — but if the gap is large, expect to spend PI differently than the plan assumes.';
+  cls += ' <span style="opacity:.75">Rough orientation only: Forza sets PI from a simulated lap, not a formula, so nothing can predict it. The Buy &amp; Install screen is the real answer.</span>';
+  out.push(['Class fit',cls]);
+
+  return out;
+}
+
 function renderPlan(i){
   const p=buildPlan(i), PI=PI_CEIL[i.cls];
 
   const hd='<div class="panel" style="margin-bottom:9px"><div class="hd">'+
-    '<div class="nm">'+(i.name||'Untitled')+' &mdash; Build Plan</div>'+
+    '<div class="nm">'+carTitle(i)+' &mdash; Build Plan</div>'+
     '<div class="mt">target '+i.cls+' '+PI+' &middot; '+DISC[i.disc].n+' &middot; '+i.dt+'</div></div>'+
     '<div style="color:var(--dim);font-size:12px">Buy in this order. The game shows PI, power-to-weight and weight deltas live on Buy &amp; Install &mdash; this is the order and the stop condition it never gives you.</div></div>';
 
   const flags=p.flags.map(x=>'<div class="flag">'+x+'</div>').join('');
+
+  const notes='<div class="sec" style="--c:var(--align)"><h3>The car, read off the numbers</h3>'+
+    '<div class="body"><div class="cnotes">'+
+    carNotes(i).map(([k,v])=>'<div class="cn"><b>'+k+'</b><span>'+v+'</span></div>').join('')+
+    '</div></div></div>';
 
   let ctx='<div class="ctx"><b>Current entry:</b> '+i.hp+' hp / '+i.wt+' lb &nbsp;&rarr;&nbsp; <span class="pw">'+
     hpk(i.hp,i.wt)+'</span> hp per 1000 lb';
@@ -944,7 +1023,7 @@ function renderPlan(i){
     'No predicted PI, weight or horsepower numbers appear anywhere above, and that is deliberate. Forza derives PI from a simulated lap rather than a formula, so no tool can honestly tell you what PI a set of parts will land on &mdash; and no public dataset exposes per-part weight or power deltas. The Buy &amp; Install screen shows all of it live as you hover. Use this for sequence and priority; use the game for numbers.'+
     '</div></div></div>';
 
-  document.getElementById('out').innerHTML=hd+flags+ctx+steps+decisions+caveat;
+  document.getElementById('out').innerHTML=hd+flags+notes+ctx+steps+decisions+caveat;
 }
 
 function drivetrainNote(i){
@@ -966,7 +1045,7 @@ function renderLib(){
   document.getElementById('out').innerHTML=hd+a.map(b=>{
     const id=encodeURIComponent(b.k);   // stable key, not a positional index
     return '<div class="libitem"><div>'+
-    '<div class="t">'+b.name+'</div><div class="s">'+b.cls+' '+b.PI+' &middot; '+DISC[b.disc].n+
+    '<div class="t">'+carTitle(b)+'</div><div class="s">'+b.cls+' '+b.PI+' &middot; '+DISC[b.disc].n+
     ' &middot; '+b.dt+'<br>'+b.hp+' hp / '+b.tq+' lb-ft &middot; '+b.wt+' lb &middot; '+b.fw+'% F &middot; '+
     hpk(b.hp,b.wt)+' hp/1000lb<br>'+TIRE_N[b.tire]+' &middot; '+b.gr+'-speed &middot; '+suspFor(b.disc)+' susp</div></div>'+
     '<div class="acts"><button class="ld" data-load="'+id+'">Load</button>'+
@@ -1473,7 +1552,7 @@ function sheet(){
       e.c.map(c=>VMETA[c.k].n+' '+fmt(c.k,c.from)+' &rarr; '+fmt(c.k,c.to)).join(' &nbsp;·&nbsp; ')+
       '</span></div>').join('')+'</div></div>' : '';
 
-  const title=(i.name||'Untitled')+' — '+i.cls+' '+r.PI+' '+d.n;
+  const title=carTitle(i).replace(/&[a-z]+;/g,'')+' — '+i.cls+' '+r.PI+' '+d.n;
 
   return '<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8">'+
 '<meta name="viewport" content="width=device-width, initial-scale=1.0">'+
@@ -1485,7 +1564,7 @@ function sheet(){
 '    <div class="header-top">\n'+
 '      <div class="header-sheet-label">Forza Horizon 6 · Tune Sheet</div>\n'+
 '      <div class="car-name">'+(i.name||'Untitled')+'</div>\n'+
-'      <div class="car-sub">'+i.gr+'-Speed · '+i.susp+' Suspension · '+TIRE_N[i.tire]+'</div>\n'+
+'      <div class="car-sub">'+(i.year?i.year+' · ':'')+i.gr+'-Speed · '+i.susp+' Suspension · '+TIRE_N[i.tire]+'</div>\n'+
 '      <div class="badges">\n'+
 '        <div class="badge-pi">'+i.cls+' '+r.PI+'</div>\n'+
 '        <div class="badge-tag">'+i.dt+'</div>\n'+
@@ -1558,7 +1637,7 @@ adj+
 const slug=s=>s.toLowerCase().replace(/[^a-z0-9]+/g,'_').replace(/^_+|_+$/g,'')||'tune';
 
 /* ===================== WIRE-UP ===================== */
-const FIELDS=['name','cls','disc','wt','fw','hp','tq','dt','gr','tire','aero','twf','twr',
+const FIELDS=['name','year','cls','disc','wt','fw','hp','tq','dt','gr','tire','aero','twf','twr',
               'tsize','rpm','vmax'];
 let restored=false;
 try{
@@ -1618,7 +1697,7 @@ const fail=msg=>{
 function readForm(needStats){
   const g=id=>document.getElementById(id).value;
   const n=id=>parseFloat(g(id));
-  const i={name:g('name').trim(),cls:g('cls'),disc:g('disc'),wt:n('wt'),fw:n('fw'),
+  const i={name:g('name').trim(),year:g('year').trim(),cls:g('cls'),disc:g('disc'),wt:n('wt'),fw:n('fw'),
            hp:n('hp'),tq:n('tq'),dt:g('dt'),gr:parseInt(g('gr')),tire:g('tire'),
            aero:g('aero'),twf:n('twf'),twr:n('twr'),
            tsize:g('tsize').trim(),rpm:n('rpm'),vmax:n('vmax')};
@@ -1707,7 +1786,7 @@ document.getElementById('out').addEventListener('click',e=>{
 
 document.getElementById('save').onclick=()=>{
   if(!BASE) return;
-  const fn=slug(BASE.i.name)+'_'+BASE.i.cls.toLowerCase()+'_'+
+  const fn=slug((BASE.i.year?BASE.i.year+' ':'')+BASE.i.name)+'_'+BASE.i.cls.toLowerCase()+'_'+
            slug(BASE.d.n.replace(/ \/ .*/,''))+'.html';
   const b=new Blob([sheet()],{type:'text/html'});
   const a=document.createElement('a');
