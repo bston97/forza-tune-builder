@@ -41,6 +41,10 @@
   input[type=number]::-webkit-inner-spin-button{-webkit-appearance:none;margin:0}
   .row2{display:grid;grid-template-columns:1fr 1fr;gap:9px}
   .rowNY{display:grid;grid-template-columns:2fr 1fr;gap:9px}
+  .mini{background:var(--panel2);border:1px solid var(--line);color:var(--dim);font-size:11px;
+        padding:4px 10px;border-radius:5px;font-weight:600;letter-spacing:.4px;
+        text-transform:none}
+  .mini:hover{border-color:var(--acc);color:var(--tx)}
   .cnotes{display:grid;gap:9px}
   .cn{display:grid;grid-template-columns:104px 1fr;gap:12px;align-items:baseline;
       font-size:12.5px;line-height:1.55}
@@ -195,10 +199,11 @@
   <div class="cols">
     <!-- ============ INPUT ============ -->
     <div class="panel">
-      <h2>Car</h2>
+      <h2 style="display:flex;justify-content:space-between;align-items:center">Car
+        <button id="newcar" type="button" class="mini" title="Clear the typed values for a fresh car — keeps class and event">New car</button></h2>
       <div class="rowNY">
         <div><label>Car name</label><input id="name" placeholder="Lancer Evolution VIII MR"></div>
-        <div><label>Year</label><input id="year" type="number" placeholder="2004"></div>
+        <div><label>Year</label><input id="year" type="number" inputmode="numeric" placeholder="2004"></div>
       </div>
 
       <div class="row2">
@@ -221,13 +226,13 @@
       </div>
 
       <div class="row2">
-        <div><label>Weight (lbs)</label><input id="wt" type="number" placeholder="3241"></div>
-        <div><label>Front %</label><input id="fw" type="number" step="0.1" placeholder="57"></div>
+        <div><label>Weight (lbs)</label><input id="wt" type="number" inputmode="decimal" placeholder="3241"></div>
+        <div><label>Front %</label><input id="fw" type="number" inputmode="decimal" step="0.1" placeholder="57"></div>
       </div>
 
       <div class="row2">
-        <div><label>HP</label><input id="hp" type="number" placeholder="612"></div>
-        <div><label>Torque (lb-ft)</label><input id="tq" type="number" placeholder="480"></div>
+        <div><label>HP</label><input id="hp" type="number" inputmode="decimal" placeholder="612"></div>
+        <div><label>Torque (lb-ft)</label><input id="tq" type="number" inputmode="decimal" placeholder="480"></div>
       </div>
 
       <div class="row2">
@@ -260,17 +265,17 @@
       <details id="extra">
         <summary>Optional &mdash; skip unless you already know these</summary>
         <div class="row2">
-          <div><label>Front tire width</label><input id="twf" type="number" placeholder="265"></div>
-          <div><label>Rear tire width</label><input id="twr" type="number" placeholder="285"></div>
+          <div><label>Front tire width</label><input id="twf" type="number" inputmode="decimal" placeholder="265"></div>
+          <div><label>Rear tire width</label><input id="twr" type="number" inputmode="decimal" placeholder="285"></div>
         </div>
         <div class="hint" style="margin-top:8px">Widths only nudge brake balance a little.</div>
 
         <div class="row2" style="margin-top:10px">
           <div><label>Tire size</label><input id="tsize" placeholder="275/35R19"></div>
-          <div><label>Redline (rpm)</label><input id="rpm" type="number" placeholder="7400"></div>
+          <div><label>Redline (rpm)</label><input id="rpm" type="number" inputmode="decimal" placeholder="7400"></div>
         </div>
         <label>Top speed (mph)</label>
-        <input id="vmax" type="number" placeholder="191">
+        <input id="vmax" type="number" inputmode="decimal" placeholder="191">
         <div class="hint" style="margin-top:8px">All three together solve final drive exactly.
           Worth skipping &mdash; you dial final drive on the in-game speed graph anyway, and that
           beats any formula.</div>
@@ -922,6 +927,9 @@ const TAGTXT={must:'Required',high:'High value',fill:'Fill',opt:'Situational',sk
 const PW_BAND=[[90,'D–C'],[130,'B'],[180,'A'],[240,'S1'],[320,'S2'],[1e9,'R / X']];
 function carNotes(i){
   const pw=hpk(i.hp,i.wt), tqr=i.tq/i.hp, fw=i.fw, W=i.wt, dt=i.dt, out=[];
+  // The plan only requires weight + hp, so torque and front % may be absent —
+  // notes that depend on them are skipped rather than printed as NaN.
+  const hasTq=isFinite(tqr)&&tqr>0, hasFw=isFinite(fw);
 
   const mass = W<2400?'Light':W<3200?'Mid-weight':W<4000?'Heavy':'Very heavy';
   const pwT  = pw<100?'modest power':pw<150?'moderate power':pw<220?'strong power'
@@ -935,13 +943,13 @@ function carNotes(i){
               :'Heavy for the power on tap. Brake early, get it turned, and protect exit speed.');
   out.push(['Character',build]);
 
-  out.push(['Engine', tqr>=1.0
+  if(hasTq) out.push(['Engine', tqr>=1.0
     ? 'Torque-rich at '+tqr.toFixed(2)+' lb-ft per hp — it pulls from low revs and will overwhelm the driven tyres on exit. That is why the diff accel lock comes out lower here.'
     : tqr>=0.8
       ? 'Fairly even torque-to-power at '+tqr.toFixed(2)+' — flexible, no particular vice in the delivery.'
       : 'Peaky at '+tqr.toFixed(2)+' lb-ft per hp — the power lives at the top, so it needs keeping on the boil. It suits more gears and rewards holding revs rather than short-shifting.']);
 
-  out.push(['Balance', fw<44
+  if(hasFw) out.push(['Balance', fw<44
     ? fw+'% front is rear-biased. Rotation comes easily and the fronts stay cool, but it can snap if you add power mid-corner. The ARB split leans on the front here to settle it.'
     : fw<48 ? fw+'% front — a slight rear bias, close to the ideal window for a road car.'
     : fw<=52 ? fw+'% front is near neutral. Very little to fight either way.'
@@ -956,11 +964,11 @@ function carNotes(i){
 
   // where this stat profile naturally goes
   const fit=[];
-  if(dt==='RWD'&&tqr>=0.85&&W<4300) fit.push('drift');
-  if(tqr>=1.0||(dt==='AWD'&&pw>180)) fit.push('drag');
+  if(dt==='RWD'&&(!hasTq||tqr>=0.85)&&W<4300) fit.push('drift');
+  if((hasTq&&tqr>=1.0)||(dt==='AWD'&&pw>180)) fit.push('drag');
   if(dt==='AWD') fit.push('dirt rally and cross-country');
   if(W<3200&&pw>=60&&pw<=300) fit.push('touge and tight circuit');
-  if(pw>=120&&(W<3800||pw>=180)&&fw>=38&&fw<=64) fit.push('road and sprint');
+  if(pw>=120&&(W<3800||pw>=180)&&(!hasFw||(fw>=38&&fw<=64))) fit.push('road and sprint');
   out.push(['Naturally suits', fit.length
     ? fit.join(', ')+'. That is read off the numbers, not the badge — a good tune moves a car a long way outside its comfort zone.'
     : 'Nothing jumps out from the numbers. It should be workable anywhere with the right build.']);
@@ -1713,26 +1721,53 @@ function readForm(needStats){
   return i;
 }
 
+/* On a phone the results render below the form — put them on screen and drop
+   the keyboard, otherwise every Calculate is followed by a manual scroll. */
+function showResults(){
+  if(window.innerWidth<=900){
+    if(document.activeElement&&document.activeElement.blur) document.activeElement.blur();
+    const el=document.getElementById('adjust');
+    ((el&&el.style.display!=='none')?el:document.getElementById('out'))
+      .scrollIntoView({behavior:'smooth',block:'start'});
+  }
+}
+
 document.getElementById('calc').onclick=()=>{
   const i=readForm(true); if(!i) return;
   BASE=compute(i); ADJ={}; LOG=[];        // new baseline clears adjustments
   render(); renderLog();
   document.getElementById('save').disabled=false;
   document.getElementById('adjust').style.display='';
-  VIEW='tune';
+  VIEW='tune'; showResults();
 };
 
 document.getElementById('plan').onclick=()=>{
   const i=readForm(false); if(!i) return;
   document.getElementById('adjust').style.display='none';
   renderPlan(i);
-  VIEW='plan';
+  VIEW='plan'; showResults();
 };
 
 document.getElementById('lib').onclick=()=>{
   document.getElementById('adjust').style.display='none';
   renderLib();
-  VIEW='lib';
+  VIEW='lib'; showResults();
+};
+
+/* Fresh car: clear every typed value — including the hidden optional block,
+   whose stale tire widths / redline / top speed would otherwise silently feed
+   the next car's brake balance and "exact" final drive. Class, event and the
+   visible dropdowns stay: they're the context you're building in. */
+document.getElementById('newcar').onclick=()=>{
+  ['name','year','wt','fw','hp','tq','twf','twr','tsize','rpm','vmax']
+    .forEach(id=>{ document.getElementById(id).value=''; });
+  applyAutoParts(true);
+  document.getElementById('save').disabled=true;
+  document.getElementById('adjust').style.display='none';
+  document.getElementById('out').innerHTML=
+    '<div class="panel empty">Fresh car — enter the stat block and hit Calculate.</div>';
+  BASE=null; ADJ={}; LOG=[]; VIEW='none';
+  document.getElementById('name').focus();
 };
 
 document.getElementById('apply').onclick=()=>{
@@ -1774,12 +1809,20 @@ document.getElementById('out').addEventListener('click',e=>{
     const r=libLoad().find(x=>x.k===decodeURIComponent(load)); if(!r) return;
     FIELDS.forEach(k=>{
       const el=document.getElementById(k);
-      if(el&&r[k]!=null&&r[k]!=='') el.value=r[k];
+      if(el) el.value=(r[k]!=null?r[k]:'');   // clear fields the build didn't set — no stale carry-over
     });
+    // rebase the auto-parts tracker so a later class change can't clobber the
+    // loaded build's tire/aero choices
+    lastAuto=autoParts(document.getElementById('cls').value,document.getElementById('disc').value);
     document.getElementById('calc').click();
   } else if(del!==undefined){
-    const k=decodeURIComponent(del);
-    libStore(libLoad().filter(x=>x.k!==k));
+    // two-tap delete — one stray thumb on a phone shouldn't erase a build
+    if(!b.dataset.arm){
+      b.dataset.arm='1'; b.textContent='Sure?';
+      setTimeout(()=>{ b.dataset.arm=''; b.textContent='Delete'; },1600);
+      return;
+    }
+    libStore(libLoad().filter(x=>x.k!==decodeURIComponent(del)));
     renderLib();
   }
 });
