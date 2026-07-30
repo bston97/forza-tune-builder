@@ -2,8 +2,16 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <title>FH6 Tune Builder</title>
+<link rel="manifest" href="./manifest.json">
+<meta name="theme-color" content="#0c0e13">
+<link rel="icon" href="./favicon-32.png" sizes="32x32">
+<link rel="apple-touch-icon" href="./apple-touch-icon.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Tune Builder">
 <style>
   :root{
     --bg:#0c0e13; --panel:#141821; --panel2:#1b202b; --line:#272e3d;
@@ -18,7 +26,16 @@
   h1{font-size:17px;margin:0 0 2px;letter-spacing:.2px}
   .sub{color:var(--dim);font-size:12px;margin-bottom:16px}
   .cols{display:grid;grid-template-columns:330px 1fr;gap:18px;align-items:start}
-  @media(max-width:900px){.cols{grid-template-columns:1fr}}
+  @media(max-width:900px){
+    .cols{grid-template-columns:1fr}
+    .wrap{padding:14px 12px calc(14px + env(safe-area-inset-bottom))}
+    /* iOS zooms the page when a focused field is under 16px — keep every
+       typeable control at 16px on small screens so tapping in doesn't jump. */
+    input,select,input.vi{font-size:16px}
+    input.vi{width:5.6em}
+    button{padding:13px}
+    .adjrow{grid-template-columns:1fr;gap:8px}
+  }
 
   .panel{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:14px}
   .panel h2{font-size:11px;text-transform:uppercase;letter-spacing:.9px;color:var(--dim);
@@ -1496,7 +1513,6 @@ document.getElementById('calc').onclick=()=>{
   const i=readForm(true); if(!i) return;
   BASE=compute(i); ADJ={}; LOG=[];        // new baseline clears adjustments
   render(); renderLog();
-  libAdd(i,BASE.PI);                      // passively grows the reference library
   document.getElementById('save').disabled=false;
   document.getElementById('adjust').style.display='';
   VIEW='tune';
@@ -1572,12 +1588,20 @@ document.getElementById('save').onclick=()=>{
   const a=document.createElement('a');
   a.href=URL.createObjectURL(b); a.download=fn; a.click();
   URL.revokeObjectURL(a.href);
+  // Saving the sheet is the commitment signal — that's what earns a library
+  // entry. Calculating alone stays throwaway so you can try things freely.
+  libAdd(BASE.i,BASE.PI);
 };
 
 document.addEventListener('keydown',e=>{
   if(e.key==='Enter'&&e.target.tagName!=='BUTTON'&&!(e.target.dataset&&e.target.dataset.k))
     document.getElementById('calc').click();
 });
+
+// Offline shell, so the app still opens with no signal once it's on the home screen.
+if('serviceWorker' in navigator&&location.protocol!=='file:'){
+  addEventListener('load',()=>navigator.serviceWorker.register('./sw.js').catch(()=>{}));
+}
 </script>
 </body>
 </html>
