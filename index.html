@@ -40,6 +40,15 @@
   input[type=number]::-webkit-outer-spin-button,
   input[type=number]::-webkit-inner-spin-button{-webkit-appearance:none;margin:0}
   .row2{display:grid;grid-template-columns:1fr 1fr;gap:9px}
+  .hint{font-size:11px;color:var(--dim);line-height:1.5;text-transform:none;letter-spacing:0;
+        font-weight:400}
+  details#extra{margin-top:14px;border-top:1px solid var(--line);padding-top:10px}
+  details#extra summary{cursor:pointer;font-size:11px;text-transform:uppercase;letter-spacing:.9px;
+        color:var(--dim);font-weight:600;list-style:none;padding:3px 0}
+  details#extra summary::-webkit-details-marker{display:none}
+  details#extra summary::before{content:'▸ ';color:var(--acc)}
+  details#extra[open] summary::before{content:'▾ '}
+  details#extra summary:hover{color:var(--tx)}
 
   .btns{display:grid;grid-template-columns:1fr 1fr;gap:9px;margin-top:16px}
   button{border:0;border-radius:7px;padding:11px;font-size:13px;font-weight:600;cursor:pointer;
@@ -220,7 +229,7 @@
           </select></div>
       </div>
 
-      <h2 style="margin-top:16px">Parts</h2>
+      <h2 style="margin-top:16px">Parts <span class="hint">— defaults follow class &amp; event</span></h2>
       <div class="row2">
         <div><label>Tires</label>
           <select id="tire">
@@ -229,34 +238,32 @@
             <option value="slick">Race Slick</option><option value="rally">Rally</option>
             <option value="offroad">Off-Road</option><option value="dragt">Drag</option>
           </select></div>
-        <div><label>Suspension</label>
-          <select id="susp"><option>Race</option><option>Rally</option><option>Off-road</option></select></div>
-      </div>
-
-      <div class="row2">
         <div><label>Aero</label>
           <select id="aero">
             <option value="none">None</option>
             <option value="rear">Rear only</option>
             <option value="both" selected>Front + Rear</option>
           </select></div>
-        <div><label>Aspiration</label>
-          <select id="asp"><option>NA</option><option>Turbo</option><option>SC</option><option>Electric</option></select></div>
       </div>
 
-      <div class="row2">
-        <div><label>Front tire width</label><input id="twf" type="number" placeholder="opt."></div>
-        <div><label>Rear tire width</label><input id="twr" type="number" placeholder="opt."></div>
-      </div>
+      <details id="extra">
+        <summary>Optional &mdash; skip unless you already know these</summary>
+        <div class="row2">
+          <div><label>Front tire width</label><input id="twf" type="number" placeholder="265"></div>
+          <div><label>Rear tire width</label><input id="twr" type="number" placeholder="285"></div>
+        </div>
+        <div class="hint" style="margin-top:8px">Widths only nudge brake balance a little.</div>
 
-      <h2 style="margin-top:16px">Gearing <span style="text-transform:none;letter-spacing:0;
-        font-weight:400;color:var(--dim)">— optional, all three for exact final drive</span></h2>
-      <div class="row2">
-        <div><label>Tire size</label><input id="tsize" placeholder="275/35R19"></div>
-        <div><label>Redline (rpm)</label><input id="rpm" type="number" placeholder="7400"></div>
-      </div>
-      <label>Top speed (mph) <span style="text-transform:none;letter-spacing:0;color:var(--dim)">— from the stats screen</span></label>
-      <input id="vmax" type="number" placeholder="191">
+        <div class="row2" style="margin-top:10px">
+          <div><label>Tire size</label><input id="tsize" placeholder="275/35R19"></div>
+          <div><label>Redline (rpm)</label><input id="rpm" type="number" placeholder="7400"></div>
+        </div>
+        <label>Top speed (mph)</label>
+        <input id="vmax" type="number" placeholder="191">
+        <div class="hint" style="margin-top:8px">All three together solve final drive exactly.
+          Worth skipping &mdash; you dial final drive on the in-game speed graph anyway, and that
+          beats any formula.</div>
+      </details>
 
       <div class="btns">
         <button id="plan" class="alt">Build Plan</button>
@@ -654,7 +661,12 @@ function libAdd(i,PI){
 }
 const hpk=(hp,wt)=>Math.round(hp/wt*1000);   // hp per 1000 lb (compute() has its own local pw)
 
+/* Suspension follows straight from the discipline, so it's derived rather than
+   asked for or stored — the Build Plan is where you're told which to buy. */
+const suspFor=disc=> disc==='rally' ? 'Rally' : disc==='cc' ? 'Off-road' : 'Race';
+
 function compute(i){
+  i.susp = suspFor(i.disc);
   const d=DISC[i.disc], PI=PI_CEIL[i.cls], W=i.wt, fp=i.fw/100;
 
   /* ---- SPRINGS: K = M(2πf)², absolute lbs/in — no slider range needed ---- */
@@ -754,8 +766,6 @@ function compute(i){
   if(i.disc==='touge'&&g>=8) w.push('<b>Gear count:</b> '+g+'-speed on touge &mdash; tight passes never use the spread and it costs PI. Recommend 6&ndash;7.');
   else if(road&&g>=8&&['D','C','B','A'].includes(i.cls)) w.push('<b>Gear count:</b> '+g+'-speed on a '+i.cls+' class road build is overkill &mdash; 8&ndash;10 gears only earn their PI on high-power S1/S2/R. Recommend 6&ndash;7.');
   if(road&&g===4) w.push('<b>Gear count:</b> 4-speed is short for '+DISC[i.disc].n+'. 6&ndash;7 recommended (5 acceptable on low power).');
-  if(i.disc==='rally'&&i.susp==='Race') w.push('<b>Suspension:</b> Race suspension on a dirt build &mdash; rally suspension ride-height window sits entirely above race. Values below assume the rally window.');
-  if(i.disc==='cc'&&i.susp!=='Off-road') w.push('<b>Suspension:</b> Cross-country wants off-road suspension for the ride-height range.');
   if(i.disc==='rally'&&!['rally','offroad'].includes(i.tire)) w.push('<b>Tires:</b> Rally tires are non-negotiable on dirt &mdash; slicks lose more to grip than they save in PI.');
   if(i.disc==='cc'&&i.tire!=='offroad') w.push('<b>Tires:</b> Cross-country needs off-road tires, max width.');
   if(['rally','cc'].includes(i.disc)&&i.dt!=='AWD') w.push('<b>Drivetrain:</b> AWD is effectively mandatory for '+DISC[i.disc].n+'.');
@@ -882,7 +892,7 @@ function render(){
     '<div class="mt">'+i.cls+' '+r.PI+' &middot; '+d.n+' &middot; '+i.dt+' &middot; '+
     i.wt+' lb &middot; '+i.fw+'% F &middot; '+i.hp+' hp / '+i.tq+' lb-ft</div></div>'+
     '<div style="color:var(--dim);font-size:12px">'+TIRE_N[i.tire]+' tires &middot; '+
-    i.susp+' suspension &middot; '+i.gr+'-speed &middot; '+i.asp+
+    i.susp+' suspension &middot; '+i.gr+'-speed'+
     (nMod?' &middot; <span style="color:var(--mod)">'+nMod+' adjusted from baseline</span>':'')+
     '</div></div>';
 
@@ -958,7 +968,7 @@ function renderLib(){
     return '<div class="libitem"><div>'+
     '<div class="t">'+b.name+'</div><div class="s">'+b.cls+' '+b.PI+' &middot; '+DISC[b.disc].n+
     ' &middot; '+b.dt+'<br>'+b.hp+' hp / '+b.tq+' lb-ft &middot; '+b.wt+' lb &middot; '+b.fw+'% F &middot; '+
-    hpk(b.hp,b.wt)+' hp/1000lb<br>'+TIRE_N[b.tire]+' &middot; '+b.gr+'-speed &middot; '+b.susp+' susp</div></div>'+
+    hpk(b.hp,b.wt)+' hp/1000lb<br>'+TIRE_N[b.tire]+' &middot; '+b.gr+'-speed &middot; '+suspFor(b.disc)+' susp</div></div>'+
     '<div class="acts"><button class="ld" data-load="'+id+'">Load</button>'+
     '<button class="dl" data-del="'+id+'">Delete</button></div></div>';
   }).join('');
@@ -1475,7 +1485,7 @@ function sheet(){
 '    <div class="header-top">\n'+
 '      <div class="header-sheet-label">Forza Horizon 6 · Tune Sheet</div>\n'+
 '      <div class="car-name">'+(i.name||'Untitled')+'</div>\n'+
-'      <div class="car-sub">'+i.asp+' · '+i.gr+'-Speed · '+i.susp+' Suspension</div>\n'+
+'      <div class="car-sub">'+i.gr+'-Speed · '+i.susp+' Suspension · '+TIRE_N[i.tire]+'</div>\n'+
 '      <div class="badges">\n'+
 '        <div class="badge-pi">'+i.cls+' '+r.PI+'</div>\n'+
 '        <div class="badge-tag">'+i.dt+'</div>\n'+
@@ -1548,11 +1558,13 @@ adj+
 const slug=s=>s.toLowerCase().replace(/[^a-z0-9]+/g,'_').replace(/^_+|_+$/g,'')||'tune';
 
 /* ===================== WIRE-UP ===================== */
-const FIELDS=['name','cls','disc','wt','fw','hp','tq','dt','gr','tire','susp','aero','asp','twf','twr',
+const FIELDS=['name','cls','disc','wt','fw','hp','tq','dt','gr','tire','aero','twf','twr',
               'tsize','rpm','vmax'];
+let restored=false;
 try{
   const s=JSON.parse(localStorage.getItem('fh6last')||'null');
-  if(s) FIELDS.forEach(k=>{ if(s[k]!=null&&s[k]!=='') document.getElementById(k).value=s[k]; });
+  if(s){ FIELDS.forEach(k=>{ const el=document.getElementById(k);
+           if(el&&s[k]!=null&&s[k]!=='') el.value=s[k]; }); restored=true; }
 }catch(e){}
 
 // build the symptom dropdown, grouped
@@ -1563,6 +1575,36 @@ try{
     '<optgroup label="'+g+'">'+groups[g].map(k=>'<option value="'+k+'">'+FIX[k].l+'</option>').join('')+'</optgroup>'
   ).join('');
 })();
+
+/* Tyre compound and aero follow directly from class and event — the same rules
+   the Build Plan states. So set them automatically and only leave them alone
+   once they've been changed by hand, which keeps two dropdowns off the
+   per-build workload without taking away the ability to override. */
+const CLS_ORDER=['D','C','B','A','S1','S2','R','X'];
+function autoParts(cls,disc){
+  const ci=CLS_ORDER.indexOf(cls);
+  let tire, aero='none';
+  if(disc==='rally') tire='rally';
+  else if(disc==='cc') tire='offroad';
+  else if(disc==='drag') tire='dragt';
+  else if(disc==='drift') tire='sport';
+  else { tire = ci>=4 ? 'slick' : ci===3 ? 'semi' : 'sport';
+         aero = ci>=3 ? 'both' : 'none'; }        // aero earns its PI from A up
+  return {tire,aero};
+}
+let lastAuto=null;                                  // what we suggested last time
+function applyAutoParts(force){
+  const cls=document.getElementById('cls').value, disc=document.getElementById('disc').value;
+  const a=autoParts(cls,disc), tEl=document.getElementById('tire'), aEl=document.getElementById('aero');
+  if(force||!lastAuto||tEl.value===lastAuto.tire) tEl.value=a.tire;
+  if(force||!lastAuto||aEl.value===lastAuto.aero) aEl.value=a.aero;
+  lastAuto=a;
+}
+['cls','disc'].forEach(id=>document.getElementById(id).addEventListener('change',()=>applyAutoParts()));
+// On a fresh browser, seed the parts from the starting class/event. On a restored
+// session, adopt whatever was saved as the baseline so it isn't overwritten.
+if(restored) lastAuto=autoParts(document.getElementById('cls').value,document.getElementById('disc').value);
+else applyAutoParts(true);
 
 const fail=msg=>{
   document.getElementById('out').innerHTML=
@@ -1578,7 +1620,7 @@ function readForm(needStats){
   const n=id=>parseFloat(g(id));
   const i={name:g('name').trim(),cls:g('cls'),disc:g('disc'),wt:n('wt'),fw:n('fw'),
            hp:n('hp'),tq:n('tq'),dt:g('dt'),gr:parseInt(g('gr')),tire:g('tire'),
-           susp:g('susp'),aero:g('aero'),asp:g('asp'),twf:n('twf'),twr:n('twr'),
+           aero:g('aero'),twf:n('twf'),twr:n('twr'),
            tsize:g('tsize').trim(),rpm:n('rpm'),vmax:n('vmax')};
   const req=needStats ? [['wt','Weight'],['fw','Front %'],['hp','HP'],['tq','Torque']]
                       : [['wt','Weight'],['hp','HP']];
