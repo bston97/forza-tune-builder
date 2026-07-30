@@ -199,13 +199,11 @@
   <div class="cols">
     <!-- ============ INPUT ============ -->
     <div class="panel">
-      <h2 style="display:flex;justify-content:space-between;align-items:center">Car
+<!-- Grouped by WHERE the numbers come from, in the order you'd hit the screens:
+     no screen at all -> one stats panel -> the tuning menu you're about to open anyway. -->
+      <h2 style="display:flex;justify-content:space-between;align-items:center">Build target
         <button id="newcar" type="button" class="mini" title="Clear the typed values for a fresh car — keeps class and event">New car</button></h2>
-      <div class="rowNY">
-        <div><label>Car name</label><input id="name" placeholder="Lancer Evolution VIII MR"></div>
-        <div><label>Year</label><input id="year" type="number" inputmode="numeric" placeholder="2004"></div>
-      </div>
-
+      <div class="hint" style="margin-bottom:2px">No menus needed — you know these already.</div>
       <div class="row2">
         <div><label>Class</label>
           <select id="cls">
@@ -225,28 +223,31 @@
           </select></div>
       </div>
 
+      <h2 style="margin-top:16px">Car stats <span class="hint">— one screen</span></h2>
+      <div class="hint" style="margin-bottom:2px">All on the Upgrades stat panel (toggle the
+        detailed display) after your last part is bought &mdash; read it once, top to bottom.</div>
+      <div class="rowNY">
+        <div><label>Car name</label><input id="name" placeholder="Lancer Evolution VIII MR"></div>
+        <div><label>Year</label><input id="year" type="number" inputmode="numeric" placeholder="2004"></div>
+      </div>
       <div class="row2">
         <div><label>Weight (lbs)</label><input id="wt" type="number" inputmode="decimal" placeholder="3241"></div>
         <div><label>Front %</label><input id="fw" type="number" inputmode="decimal" step="0.1" placeholder="57"></div>
       </div>
-
       <div class="row2">
         <div><label>HP</label><input id="hp" type="number" inputmode="decimal" placeholder="612"></div>
         <div><label>Torque (lb-ft)</label><input id="tq" type="number" inputmode="decimal" placeholder="480"></div>
       </div>
+      <label>Drivetrain</label>
+      <select id="dt"><option>RWD</option><option>AWD</option><option>FWD</option></select>
 
+      <h2 style="margin-top:16px">What's fitted <span class="hint">— you chose these; defaults follow class &amp; event</span></h2>
       <div class="row2">
-        <div><label>Drivetrain</label>
-          <select id="dt"><option>RWD</option><option>AWD</option><option>FWD</option></select></div>
         <div><label>Gears</label>
           <select id="gr">
             <option>4</option><option>5</option><option selected>6</option><option>7</option>
             <option>8</option><option>9</option><option>10</option>
           </select></div>
-      </div>
-
-      <h2 style="margin-top:16px">Parts <span class="hint">— defaults follow class &amp; event</span></h2>
-      <div class="row2">
         <div><label>Tires</label>
           <select id="tire">
             <option value="stock">Stock</option><option value="street">Street</option>
@@ -254,13 +255,15 @@
             <option value="slick">Race Slick</option><option value="rally">Rally</option>
             <option value="offroad">Off-Road</option><option value="dragt">Drag</option>
           </select></div>
-        <div><label>Aero</label>
-          <select id="aero">
-            <option value="none">None</option>
-            <option value="rear">Rear only</option>
-            <option value="both" selected>Front + Rear</option>
-          </select></div>
       </div>
+      <label>Aero</label>
+      <select id="aero">
+        <option value="none">None</option>
+        <option value="rear">Rear only</option>
+        <option value="both" selected>Front + Rear</option>
+      </select>
+      <div class="hint" style="margin-top:6px">Gear count = the number in the transmission's
+        name (or count the sliders on the Gearing tab). Compound shows on the Tires tab.</div>
 
       <details id="extra">
         <summary>Optional &mdash; skip unless you already know these</summary>
@@ -268,7 +271,7 @@
           <div><label>Front tire width</label><input id="twf" type="number" inputmode="decimal" placeholder="265"></div>
           <div><label>Rear tire width</label><input id="twr" type="number" inputmode="decimal" placeholder="285"></div>
         </div>
-        <div class="hint" style="margin-top:8px">Widths only nudge brake balance a little.</div>
+        <div class="hint" style="margin-top:8px">From the tire upgrade screen. Widths only nudge brake balance a little.</div>
 
         <div class="row2" style="margin-top:10px">
           <div><label>Tire size</label><input id="tsize" placeholder="275/35R19"></div>
@@ -276,9 +279,10 @@
         </div>
         <label>Top speed (mph)</label>
         <input id="vmax" type="number" inputmode="decimal" placeholder="191">
-        <div class="hint" style="margin-top:8px">All three together solve final drive exactly.
-          Worth skipping &mdash; you dial final drive on the in-game speed graph anyway, and that
-          beats any formula.</div>
+        <div class="hint" style="margin-top:8px">Size from the tire upgrade screen; redline reads
+          off the right edge of the Gearing-tab graph; top speed from the stats screen. All three
+          together solve final drive exactly &mdash; but you dial final drive on the in-game speed
+          graph anyway, so skipping these is fine.</div>
       </details>
 
       <div class="btns">
@@ -738,7 +742,12 @@ function compute(i){
   const bal=cl(i.fw-wd*0.15,44,60);
 
   /* ---- DIFF ---- */
-  let ac=cl(62-(i.tq-300)/20+(W-3000)/200,25,80);
+  /* Accel lock scales with torque and weight (Boston's rule), clamped into a
+     band bracketing ForzaTune's documented FH6 range (RWD 40-60%) so extreme
+     stat combos can't run away to the slider ends. Decel deliberately stays
+     LOW — ForzaTune publishes 20-40% for RWD, but high decel is a documented
+     recurring error in these builds and low decel is the confirmed preference. */
+  let ac=cl(62-(i.tq-300)/20+(W-3000)/200,32,72);
   if(i.disc==='drift')ac=92; else if(i.disc==='drag')ac=95;
   else if(i.disc==='rally')ac=cl(ac*0.85,20,70); else if(i.disc==='cc')ac=cl(ac*0.80,20,70);
   const dec=d.dec;
@@ -747,7 +756,9 @@ function compute(i){
     dfa=ac*0.55; dfd=0; dra=ac; drd=dec;
     dc=(i.disc==='rally')?52:(i.disc==='cc'||i.disc==='drag')?50:cl(55+(i.fw-50)*0.8,50,70);
   } else if(i.dt==='FWD'){
-    dfa=cl(ac*0.75,20,60); dfd=Math.min(dec,10);
+    // FWD runs far less lock than RWD — the axle also steers. ForzaTune's FH6
+    // band is 20-30% accel / 0-10% decel; the old 0.75 factor landed near 50.
+    dfa=cl(ac*0.45,18,35); dfd=Math.min(dec,10);
   } else { dra=ac; drd=dec; }
 
   /* ---- GEARING ----
@@ -882,7 +893,7 @@ function render(){
     if(eff('aeR')!=null)rows.push(['Rear',vin('aeR')]);
     R.push(sec('var(--aero)','Aero',rows,
       i.aero==='both'
-        ? 'Set front to its position, then adjust rear until the in-game <b>Aero Balance reads 0.40&ndash;0.45</b>. The balance reading is the real target &mdash; do not chase absolute lbs.'
+        ? 'Set front to its position, then adjust rear until the in-game <b>Aero Balance reads 0.42&ndash;0.48 (sweet spot 0.45)</b>. The balance reading is the real target &mdash; do not chase absolute lbs.'
         : '<b>Rear aero only.</b> With a fixed front, the in-game balance figure is not a reliable target &mdash; trust mechanical balance from diff, ARB and springs instead.'));
   } else {
     R.push(sec('var(--aero)','Aero',[['&mdash;','No aero']],
@@ -1532,7 +1543,7 @@ function sheet(){
                               :row('Front Downforce','Not adjustable','dim'))+
       row('Rear Downforce',sv('aeR'),'val-teal')+
       '<div class="aero-note">'+(aeroBoth
-        ? 'Set front to its position, then adjust rear until in-game <strong>Aero Balance reads 0.40&ndash;0.45</strong>. That reading is the real target &mdash; lbs values are secondary.'
+        ? 'Set front to its position, then adjust rear until in-game <strong>Aero Balance reads 0.42&ndash;0.48 (sweet spot 0.45)</strong>. That reading is the real target &mdash; lbs values are secondary.'
         : 'Front is fixed, so the in-game balance figure is <strong>not a reliable target</strong> here &mdash; trust mechanical balance from the diff, ARBs and springs instead.')+'</div>';
   } else {
     aeroBody=row('Downforce', i.disc==='drag'?'None &mdash; drag build':'No adjustable aero')+
