@@ -1,0 +1,1583 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>FH6 Tune Builder</title>
+<style>
+  :root{
+    --bg:#0c0e13; --panel:#141821; --panel2:#1b202b; --line:#272e3d;
+    --tx:#e6ebf5; --dim:#8b95a9; --acc:#4da3ff; --mod:#ffd43b;
+    --tire:#ff6b6b; --gear:#ffa94d; --align:#ffd43b; --arb:#a9e34b;
+    --spring:#38d9a9; --damp:#4dabf7; --aero:#9775fa; --brake:#f783ac; --diff:#ff922b;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--tx);
+       font:14px/1.45 ui-sans-serif,system-ui,"Segoe UI",Roboto,sans-serif}
+  .wrap{max-width:1400px;margin:0 auto;padding:18px}
+  h1{font-size:17px;margin:0 0 2px;letter-spacing:.2px}
+  .sub{color:var(--dim);font-size:12px;margin-bottom:16px}
+  .cols{display:grid;grid-template-columns:330px 1fr;gap:18px;align-items:start}
+  @media(max-width:900px){.cols{grid-template-columns:1fr}}
+
+  .panel{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:14px}
+  .panel h2{font-size:11px;text-transform:uppercase;letter-spacing:.9px;color:var(--dim);
+            margin:0 0 10px;font-weight:600}
+
+  label{display:block;font-size:11px;color:var(--dim);margin:9px 0 3px;
+        text-transform:uppercase;letter-spacing:.5px}
+  input,select{width:100%;background:var(--panel2);border:1px solid var(--line);color:var(--tx);
+        border-radius:6px;padding:7px 9px;font:14px ui-monospace,Consolas,monospace}
+  input:focus,select:focus{outline:none;border-color:var(--acc)}
+  input[type=number]{-moz-appearance:textfield}
+  input[type=number]::-webkit-outer-spin-button,
+  input[type=number]::-webkit-inner-spin-button{-webkit-appearance:none;margin:0}
+  .row2{display:grid;grid-template-columns:1fr 1fr;gap:9px}
+
+  .btns{display:grid;grid-template-columns:1fr 1fr;gap:9px;margin-top:16px}
+  button{border:0;border-radius:7px;padding:11px;font-size:13px;font-weight:600;cursor:pointer;
+         font-family:inherit}
+  #calc{background:var(--acc);color:#06121f}
+  button.alt,#save{background:var(--panel2);color:var(--tx);border:1px solid var(--line)}
+  #save:disabled{opacity:.35;cursor:not-allowed}
+  #calc:hover{background:#6bb4ff}
+  button.alt:hover,#save:hover:not(:disabled){border-color:var(--acc)}
+
+  /* ---- build plan ---- */
+  .step{border:1px solid var(--line);border-radius:9px;margin-bottom:8px;
+        background:var(--panel);overflow:hidden}
+  .step .sh{display:flex;align-items:center;gap:9px;padding:8px 12px;background:var(--panel2)}
+  .step .num{width:20px;height:20px;border-radius:5px;background:var(--line);color:var(--dim);
+        font:700 11px/20px ui-monospace,Consolas,monospace;text-align:center;flex:none}
+  .step .nm{font-weight:600;font-size:13.5px;flex:1}
+  .tag{font-size:9.5px;text-transform:uppercase;letter-spacing:.09em;padding:2px 7px;
+        border-radius:4px;font-weight:700;flex:none}
+  .tag.must{background:#3a1520;color:#ff8fa3}
+  .tag.high{background:#12301c;color:#8ce99a}
+  .tag.fill{background:#132b3d;color:#8ecbff}
+  .tag.opt {background:#2a2418;color:#e0c98a}
+  .tag.skip{background:#24262b;color:#9aa3b2}
+  .step .sb{padding:9px 12px;font-size:12.5px;color:var(--dim);line-height:1.55}
+  .step .pick{color:var(--tx);font-weight:600;display:block;margin-bottom:5px}
+  .step .watch,.step .unlock{margin-top:6px;padding-top:6px;border-top:1px dashed var(--line);
+        font-size:11.5px}
+  .step .unlock{color:#8ce99a}
+  .flag{background:#3a1520;border:1px solid #7a2437;color:#ffc9d2;padding:9px 12px;
+        border-radius:7px;font-size:12.5px;margin-bottom:9px;line-height:1.5}
+  .flag b{color:#ff8fa3}
+  .ctx{background:var(--panel);border:1px solid var(--line);border-radius:9px;
+       padding:11px 13px;margin-bottom:9px;font-size:12px;color:var(--dim);line-height:1.6}
+  .ctx b{color:var(--tx)}
+  .ctx .pw{font:700 20px ui-monospace,Consolas,monospace;color:var(--acc)}
+  .peer{font-family:ui-monospace,Consolas,monospace;font-size:11.5px;color:#c8d2e4}
+
+  /* ---- library ---- */
+  .libitem{border:1px solid var(--line);border-radius:9px;padding:10px 12px;background:var(--panel);
+        display:grid;grid-template-columns:1fr auto;gap:10px;align-items:center;margin-bottom:8px}
+  .libitem .t{font-weight:600;font-size:13.5px}
+  .libitem .s{color:var(--dim);font-size:11.5px;font-family:ui-monospace,Consolas,monospace;
+        margin-top:3px;line-height:1.5}
+  .libitem .acts{display:flex;gap:6px;flex:none}
+  .libitem button{padding:6px 11px;font-size:11.5px;font-weight:600}
+  .libitem .ld{background:var(--panel2);color:var(--tx);border:1px solid var(--line)}
+  .libitem .ld:hover{border-color:var(--acc)}
+  .libitem .dl{background:transparent;color:#7a5560;border:1px solid #3a2028}
+  .libitem .dl:hover{background:#3a1520;color:#ffc9d2}
+
+  .empty{color:var(--dim);text-align:center;padding:56px 20px;font-size:13px}
+
+  .warn{background:#3a2a12;border:1px solid #7a5417;color:#ffd8a8;
+        padding:9px 12px;border-radius:7px;font-size:12.5px;margin-bottom:10px}
+  .warn b{color:#ffc078}
+
+  /* ---- fine-tune bar ---- */
+  #adjust{margin-bottom:9px;display:none}
+  .adjrow{display:grid;grid-template-columns:1fr auto auto;gap:9px;align-items:center}
+  .adjrow select{padding:9px}
+  .adjrow button{padding:9px 14px;white-space:nowrap}
+  #apply{background:var(--arb);color:#12200a}
+  #apply:hover{background:#bef264}
+  #reset{background:var(--panel2);color:var(--dim);border:1px solid var(--line)}
+  #reset:hover{border-color:var(--acc);color:var(--tx)}
+  .log{margin-top:11px;padding-top:10px;border-top:1px dashed var(--line);
+       font-size:11.5px;color:var(--dim);max-height:150px;overflow-y:auto}
+  .log .e{margin-bottom:5px;line-height:1.5}
+  .log .e b{color:var(--mod);font-weight:600}
+  .log .e code{font-family:ui-monospace,Consolas,monospace;color:#c8d2e4}
+
+  .sec{border:1px solid var(--line);border-radius:9px;margin-bottom:9px;overflow:hidden;
+       background:var(--panel)}
+  .sec>h3{margin:0;font-size:11px;letter-spacing:1.1px;text-transform:uppercase;
+       padding:7px 12px;background:var(--panel2);border-left:3px solid var(--c)}
+  .sec .body{padding:10px 12px}
+  .kv{display:grid;grid-template-columns:1fr auto;gap:4px 14px;align-items:baseline}
+  .kv .k{color:var(--dim);font-size:12.5px;padding:2.5px 0}
+  .kv .v{font:600 15px/1.3 ui-monospace,Consolas,monospace;text-align:right;padding:2.5px 0;
+         white-space:nowrap}
+  .kv .v .u{color:var(--dim);font-size:11.5px;font-weight:400;margin-left:3px}
+
+  /* editable value inputs */
+  input.vi{width:5.2em;background:transparent;border:1px solid transparent;border-radius:4px;
+        color:var(--tx);text-align:right;padding:1px 4px;
+        font:600 15px ui-monospace,Consolas,monospace}
+  input.vi:hover{border-color:var(--line);background:var(--panel2)}
+  input.vi:focus{border-color:var(--acc);background:var(--panel2);outline:none}
+  input.vi.mod{color:var(--mod)}
+
+  .note{margin-top:9px;padding-top:9px;border-top:1px dashed var(--line);
+        color:var(--dim);font-size:11.5px;line-height:1.5}
+  .note b{color:#c8d2e4;font-weight:600}
+  .gears{display:grid;gap:4px;margin-top:8px}
+  .gears .g{display:flex;justify-content:space-between;font:12.5px ui-monospace,Consolas,monospace;
+        background:var(--panel2);padding:3px 8px;border-radius:4px}
+  .gears .g span:first-child{color:var(--dim)}
+  .hd{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:10px;
+      padding-bottom:9px;border-bottom:1px solid var(--line);flex-wrap:wrap;gap:6px}
+  .hd .nm{font-size:16px;font-weight:600}
+  .hd .mt{color:var(--dim);font-size:12px;font-family:ui-monospace,Consolas,monospace}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>FH6 Tune Builder</h1>
+  <div class="sub">Stat block in &rarr; tune out, in Forza tuning-menu order. Drive it, then fix what you feel.</div>
+
+  <div class="cols">
+    <!-- ============ INPUT ============ -->
+    <div class="panel">
+      <h2>Car</h2>
+      <label>Car name</label>
+      <input id="name" placeholder="Lancer Evolution VIII MR">
+
+      <div class="row2">
+        <div><label>Class</label>
+          <select id="cls">
+            <option>D</option><option>C</option><option>B</option>
+            <option selected>A</option><option>S1</option><option>S2</option>
+            <option>R</option><option>X</option>
+          </select></div>
+        <div><label>Event</label>
+          <select id="disc">
+            <option value="road" selected>Road / Circuit</option>
+            <option value="sprint">Sprint / Speed Race</option>
+            <option value="touge">Touge</option>
+            <option value="drift">Drift</option>
+            <option value="drag">Drag</option>
+            <option value="rally">Dirt Rally</option>
+            <option value="cc">Cross-Country</option>
+          </select></div>
+      </div>
+
+      <div class="row2">
+        <div><label>Weight (lbs)</label><input id="wt" type="number" placeholder="3241"></div>
+        <div><label>Front %</label><input id="fw" type="number" step="0.1" placeholder="57"></div>
+      </div>
+
+      <div class="row2">
+        <div><label>HP</label><input id="hp" type="number" placeholder="612"></div>
+        <div><label>Torque (lb-ft)</label><input id="tq" type="number" placeholder="480"></div>
+      </div>
+
+      <div class="row2">
+        <div><label>Drivetrain</label>
+          <select id="dt"><option>RWD</option><option>AWD</option><option>FWD</option></select></div>
+        <div><label>Gears</label>
+          <select id="gr">
+            <option>4</option><option>5</option><option selected>6</option><option>7</option>
+            <option>8</option><option>9</option><option>10</option>
+          </select></div>
+      </div>
+
+      <h2 style="margin-top:16px">Parts</h2>
+      <div class="row2">
+        <div><label>Tires</label>
+          <select id="tire">
+            <option value="stock">Stock</option><option value="street">Street</option>
+            <option value="sport" selected>Sport</option><option value="semi">Semi-Slick</option>
+            <option value="slick">Race Slick</option><option value="rally">Rally</option>
+            <option value="offroad">Off-Road</option><option value="dragt">Drag</option>
+          </select></div>
+        <div><label>Suspension</label>
+          <select id="susp"><option>Race</option><option>Rally</option><option>Off-road</option></select></div>
+      </div>
+
+      <div class="row2">
+        <div><label>Aero</label>
+          <select id="aero">
+            <option value="none">None</option>
+            <option value="rear">Rear only</option>
+            <option value="both" selected>Front + Rear</option>
+          </select></div>
+        <div><label>Aspiration</label>
+          <select id="asp"><option>NA</option><option>Turbo</option><option>SC</option><option>Electric</option></select></div>
+      </div>
+
+      <div class="row2">
+        <div><label>Front tire width</label><input id="twf" type="number" placeholder="opt."></div>
+        <div><label>Rear tire width</label><input id="twr" type="number" placeholder="opt."></div>
+      </div>
+
+      <div class="btns">
+        <button id="plan" class="alt">Build Plan</button>
+        <button id="calc">Calculate</button>
+      </div>
+      <div class="btns" style="margin-top:9px">
+        <button id="save" disabled>Save Sheet</button>
+        <button id="lib" class="alt">Library</button>
+      </div>
+    </div>
+
+    <!-- ============ OUTPUT ============ -->
+    <div>
+      <div id="adjust" class="panel">
+        <h2>Fine-tune &mdash; what did it do on track?</h2>
+        <div class="adjrow">
+          <select id="sym"></select>
+          <button id="apply">Apply Fix</button>
+          <button id="reset">Reset</button>
+        </div>
+        <div id="log" class="log" style="display:none"></div>
+      </div>
+      <div id="out"><div class="panel empty">Enter the stat block and hit Calculate.</div></div>
+    </div>
+  </div>
+</div>
+
+<script>
+const PI_CEIL={D:400,C:500,B:600,A:700,S1:800,S2:900,R:998,X:999};
+
+/* aF/aR are multipliers on the axle-load-proportional ARB base (1.0 = neutral
+   for that axle's share of the weight). <1 front + >1 rear = rotation trim. */
+const DISC={
+ road  :{n:'Road / Circuit', fF:1.00,fR:0.97, zF:.62,zR:.62, aF:0.93,aR:1.05,
+         camF:-2.2,camR:-1.3, toeF:0.0,toeR:-0.1, cast:6.7, rhF:0,rhR:0, fd:3.70, dec:15, aeF:60},
+ sprint:{n:'Sprint / Speed Race', fF:0.98,fR:0.95, zF:.60,zR:.60, aF:0.95,aR:1.02,
+         camF:-2.0,camR:-1.2, toeF:0.0,toeR:-0.1, cast:6.7, rhF:0,rhR:0, fd:3.55, dec:12, aeF:55},
+ touge :{n:'Touge', fF:0.94,fR:0.90, zF:.58,zR:.58, aF:0.88,aR:1.10,
+         camF:-2.4,camR:-1.4, toeF:0.1,toeR:-0.1, cast:6.7, rhF:10,rhR:15, fd:4.20, dec:10, aeF:65},
+ drift :{n:'Drift', fF:0.88,fR:1.12, zF:.55,zR:.65, aF:0.60,aR:1.35,
+         camF:-2.8,camR:-1.0, toeF:0.3,toeR:0.1, cast:7.0, rhF:5,rhR:15, fd:3.50, dec:5, aeF:50},
+ drag  :{n:'Drag', fF:1.10,fR:0.88, zF:.60,zR:.50, aF:1.00,aR:0.70,
+         camF:-0.5,camR:-0.2, toeF:0.0,toeR:0.0, cast:5.0, rhF:0,rhR:5, fd:3.30, dec:0, aeF:0},
+ rally :{n:'Dirt Rally', fF:0.62,fR:0.60, zF:.68,zR:.68, aF:0.22,aR:0.24,
+         camF:-1.2,camR:-0.8, toeF:0.1,toeR:-0.2, cast:6.0, rhF:75,rhR:75, fd:4.40, dec:12, aeF:50},
+ cc    :{n:'Cross-Country', fF:0.52,fR:0.50, zF:.70,zR:.70, aF:0.15,aR:0.16,
+         camF:-0.8,camR:-0.5, toeF:0.0,toeR:-0.2, cast:6.0, rhF:100,rhR:100, fd:4.80, dec:15, aeF:50}
+};
+
+const PSI={stock:27,street:27,sport:27.5,semi:31,slick:31.5,rally:25,offroad:24,dragt:28};
+const TIRE_N={stock:'Stock',street:'Street',sport:'Sport',semi:'Semi-Slick',
+              slick:'Race Slick',rally:'Rally',offroad:'Off-Road',dragt:'Drag'};
+
+const SPREAD={
+ 4:[2.90,1.85,1.30,1.00],
+ 5:[2.90,1.95,1.45,1.15,0.92],
+ 6:[2.89,1.99,1.50,1.20,1.00,0.85],
+ 7:[2.92,2.05,1.60,1.30,1.10,0.95,0.82],
+ 8:[2.95,2.15,1.72,1.42,1.20,1.03,0.90,0.79],
+ 9:[3.00,2.25,1.82,1.53,1.31,1.14,1.00,0.88,0.78],
+ 10:[3.05,2.35,1.92,1.63,1.41,1.24,1.10,0.98,0.87,0.78]
+};
+
+/* Every tunable output value: display name, unit, in-game step, decimals, limits.
+   `step` doubles as the rounding grain so adjustments always land on a value the
+   game will actually accept. */
+const VMETA={
+ pF  :{n:'Tire psi F',   u:'psi',       s:0.5,  d:1, lo:10, hi:55},
+ pR  :{n:'Tire psi R',   u:'psi',       s:0.5,  d:1, lo:10, hi:55},
+ fd  :{n:'Final drive',  u:'',          s:0.01, d:2, lo:2.0, hi:7.0},
+ camF:{n:'Camber F',     u:'°',    s:0.1,  d:1, lo:-10, hi:2},
+ camR:{n:'Camber R',     u:'°',    s:0.1,  d:1, lo:-10, hi:2},
+ toeF:{n:'Toe F',        u:'°',    s:0.1,  d:1, lo:-5, hi:5, sign:1},
+ toeR:{n:'Toe R',        u:'°',    s:0.1,  d:1, lo:-5, hi:5, sign:1},
+ cast:{n:'Caster',       u:'°',    s:0.1,  d:1, lo:1,  hi:8},
+ arF :{n:'ARB F',        u:'',          s:0.1,  d:1, lo:1,  hi:65},
+ arR :{n:'ARB R',        u:'',          s:0.1,  d:1, lo:1,  hi:65},
+ spF :{n:'Spring F',     u:'lb/in',     s:1,    d:0, lo:20, hi:3000},
+ spR :{n:'Spring R',     u:'lb/in',     s:1,    d:0, lo:20, hi:3000},
+ rhF :{n:'Ride height F',u:'% of range',s:1,    d:0, lo:0,  hi:100},
+ rhR :{n:'Ride height R',u:'% of range',s:1,    d:0, lo:0,  hi:100},
+ reF :{n:'Rebound F',    u:'',          s:0.1,  d:1, lo:1,  hi:20},
+ reR :{n:'Rebound R',    u:'',          s:0.1,  d:1, lo:1,  hi:20},
+ buF :{n:'Bump F',       u:'',          s:0.1,  d:1, lo:1,  hi:20},
+ buR :{n:'Bump R',       u:'',          s:0.1,  d:1, lo:1,  hi:20},
+ aeF :{n:'Aero F',       u:'% of range',s:1,    d:0, lo:0,  hi:100},
+ aeR :{n:'Aero R',       u:'% of range',s:1,    d:0, lo:0,  hi:100},
+ bal :{n:'Brake balance',u:'% front',   s:1,    d:0, lo:30, hi:70},
+ pres:{n:'Brake pressure',u:'%',        s:1,    d:0, lo:50, hi:150},
+ dfa :{n:'Front accel',  u:'%',         s:1,    d:0, lo:0,  hi:100},
+ dfd :{n:'Front decel',  u:'%',         s:1,    d:0, lo:0,  hi:100},
+ dra :{n:'Rear accel',   u:'%',         s:1,    d:0, lo:0,  hi:100},
+ drd :{n:'Rear decel',   u:'%',         s:1,    d:0, lo:0,  hi:100},
+ dc  :{n:'Center',       u:'%',         s:1,    d:0, lo:0,  hi:100}
+};
+
+/* Symptom -> targeted fix. Deltas are one in-game increment's worth; apply twice
+   for a bigger move. `m` = multiplicative (fraction), otherwise additive.
+   `dyn(dt)` adds drivetrain-dependent deltas. Every mapping below comes from the
+   diagnostic rules already written into the tune notes. */
+const FIX={
+ entry_us :{g:'Entry / braking', l:'Understeer on turn-in',
+   d:[['arF',-0.10,'m'],['reF',-0.8],['bal',-2],['toeF',0.1]]},
+ entry_os :{g:'Entry / braking', l:'Rear steps out under braking',
+   d:[['bal',2],['arR',-0.08,'m'],['drd',3],['toeR',-0.1]]},
+ lockup   :{g:'Entry / braking', l:'Front tires locking up',
+   d:[['pres',-5]]},
+ dive     :{g:'Entry / braking', l:'Nose dives under braking',
+   d:[['buF',0.8]]},
+
+ mid_us   :{g:'Mid-corner', l:'Understeer mid-corner',
+   d:[['arF',-0.10,'m'],['spF',-0.04,'m'],['aeF',5],['dc',3]]},
+ mid_os   :{g:'Mid-corner', l:'Oversteer mid-corner',
+   d:[['arR',-0.10,'m'],['spR',-0.04,'m'],['aeR',5]]},
+ roll     :{g:'Mid-corner', l:'Body roll / floaty, slow to settle',
+   d:[['arF',0.08,'m'],['arR',0.08,'m'],['reF',0.6],['reR',0.6]]},
+ skip     :{g:'Mid-corner', l:'Skipping / losing grip over bumps',
+   d:[['buF',-1.0],['buR',-1.0]]},
+ bottom   :{g:'Mid-corner', l:'Bottoming out (springs telemetry 97%+)',
+   d:[['rhF',5],['rhR',5],['spF',0.05,'m'],['spR',0.05,'m']]},
+
+ spin     :{g:'Exit', l:'Wheelspin on corner exit',
+   dyn:dt=> dt==='AWD'?[['dra',-8],['dfa',-4],['pR',-0.5]]
+          : dt==='FWD'?[['dfa',-8],['pF',-0.5]] : [['dra',-8],['pR',-0.5]]},
+ snap     :{g:'Exit', l:'Snap oversteer on exit',
+   d:[['arR',-0.08,'m'],['spR',-0.03,'m']],
+   dyn:dt=> dt==='FWD'?[]:[['dra',-10]]},
+ exit_us  :{g:'Exit', l:'Power-on understeer / push on exit',
+   d:[['dc',4],['arF',-0.06,'m']],
+   dyn:dt=> dt==='AWD'?[['dfa',-6]] : dt==='FWD'?[['dfa',-8]] : [['dra',-5]]},
+ slow_exit:{g:'Exit', l:'Weak acceleration out of corners',
+   d:[['fd',0.15]]},
+
+ lim_early:{g:'Straights', l:'Hits limiter before end of straight',
+   d:[['fd',-0.15]]},
+ lim_never:{g:'Straights', l:'Never reaches limiter in top gear',
+   d:[['fd',0.15]]},
+
+ hot_f :{g:'Telemetry', l:'Front tires overheating (red)',  d:[['pF',0.5]]},
+ hot_r :{g:'Telemetry', l:'Rear tires overheating (red)',   d:[['pR',0.5]]},
+ cold_f:{g:'Telemetry', l:'Front tires staying cold (blue)',d:[['pF',-0.5]]},
+ cold_r:{g:'Telemetry', l:'Rear tires staying cold (blue)', d:[['pR',-0.5]]},
+ out_f :{g:'Telemetry', l:'Front outer edge hotter',        d:[['camF',-0.3]]},
+ in_f  :{g:'Telemetry', l:'Front inner edge hotter',        d:[['camF',0.3]]},
+ out_r :{g:'Telemetry', l:'Rear outer edge hotter',         d:[['camR',-0.3]]},
+ in_r  :{g:'Telemetry', l:'Rear inner edge hotter',         d:[['camR',0.3]]}
+};
+
+/* ===================== UPGRADE PATH =====================
+   Ordered build plan per discipline. Deliberately contains NO predicted PI /
+   weight / hp numbers: Forza derives PI from a simulated lap, not a formula,
+   and no public dataset exposes per-part deltas. The Buy & Install screen
+   already shows live before/after for every part — so this tells you the
+   ORDER and the STOP CONDITION, which the game never does, and points at what
+   to read on that screen at each step. */
+
+const TIRE_BY_CLASS={
+ D :'Sport — or stay stock if the car is very light',
+ C :'Sport — or stay stock if the car is very light',
+ B :'Sport',
+ A :'Sport or Semi-Slick, whichever the PI budget allows',
+ S1:'Race Slick', S2:'Race Slick', R:'Race Slick', X:'Race Slick'
+};
+
+const SWAP_NOTE='<b>Engine swap:</b> don\'t swap by default — plenty of stock engines have good character and a swap is expensive in PI. On Buy &amp; Install compare power-to-weight before and after: a swap that raises PWR is usually worth it, one that holds it flat or drops it for a PI cost rarely is. Watch the weight delta too — a heavy V12 or big V8 pushes mass forward and can ruin a light chassis. Match character to the job: high-revving screamers for road and touge, torque-rich V8s for drag, drift and cross-country, small turbo fours for dirt.';
+const WIDEBODY_NOTE='<b>Widebody:</b> only if you actually need the wider tires. It adds weight and PI, and sometimes unlocks front aero. Skip it otherwise.';
+
+function tarmacPath(i){
+  const aPlus=['A','S1','S2','R','X'].includes(i.cls);
+  return [
+   {n:'Tires', tag:'must', pick:TIRE_BY_CLASS[i.cls],
+    why:'Grip is the cheapest lap time in the game and every later decision assumes it. Rear width is almost always worth the PI; front width is situational — go wider only if the car pushes on entry.',
+    watch:'Handling should jump noticeably. If a compound step costs more PI than the handling it returns, drop back one — on a light low-power car Sport tires can cost more in power-to-weight than the grip is worth.',
+    unlock:'Tire pressure is adjustable on any tire — no upgrade needed for it.'},
+
+   {n:'Brakes', tag:'must', pick:'Race brakes',
+    why:'Stock brakes lock and destabilise the car under threshold braking. On a build meant to trail-brake this is not optional.',
+    watch:'Braking rating rises for a small PI cost — one of the better-value buys on the list.',
+    unlock:'Brake balance and brake pressure sliders.'},
+
+   {n:'Suspension', tag:'must', pick:'Race springs and dampers',
+    why:'Without it there is no spring rate, ride height or damping control at all — most of the tune this app generates would have nowhere to go.',
+    watch:'Modest handling gain on paper; the real return is tunability.',
+    unlock:'Spring rate, ride height, bump, rebound, and alignment (camber / toe / caster).'},
+
+   {n:'Anti-roll bars', tag:'must', pick:'Race anti-roll bars',
+    why:'Independent front/rear roll stiffness is the main tool for setting the car\'s balance. Without it you are stuck with whatever bias the chassis came with.',
+    watch:'Very small PI cost for a large amount of tuning leverage.',
+    unlock:'Front and rear ARB sliders — and the Mechanical Balance reading the tune targets.'},
+
+   {n:'Differential', tag:'must', pick:'Race differential',
+    why:'Controls how the driven axle puts power down on exit and how freely the car rotates on entry.',
+    watch:'Small PI cost.',
+    unlock:'Accel and decel lock' + (i.dt==='AWD'?', plus the centre balance split.':'.')},
+
+   {n:'Weight reduction', tag:'high', pick:'As much as the budget allows — before you buy any power',
+    why:'Weight works on every one of the five PI factors at once: cornering, braking, acceleration and launch. Power only moves two of them. That is the whole reason grip-and-mass come before power.',
+    watch:'Weight drops while handling, braking and acceleration all rise together — rare for one purchase to move that many ratings the right way.'},
+
+   {n:'Transmission', tag:'opt',
+    pick:'Sport transmission if the stock gear count suits the build; Race transmission only if you need different gearing or a different number of gears',
+    why:'This tune only ever moves the final drive — individual ratios stay at the race-box default. Sport transmission gives you the final drive slider for meaningfully less PI than Race. Race earns its cost when the stock box has too few gears or badly spaced ones.',
+    watch:'The gear count in the part name is what the tune assumes — check it matches what you entered.',
+    unlock:'Sport → final drive. Race → final drive, individual ratios, and gear count.'},
+
+   {n:'Power', tag:'fill', pick:'Fill whatever PI is left, up to the class ceiling',
+    why:'Power comes last because it is the easiest thing to add and the hardest to use. Once the chassis works, convert the remaining budget into power — and always build to the ceiling, since a throttle-limited car at 805 PI loses to a proper build at 800.',
+    watch:'Watch power-to-weight rather than peak HP, and notice where the power lands in the rev range — a peaky top-end build is harder to drive out of slow corners than the HP number suggests.'},
+
+   {n:'Aero', tag:aPlus?'high':'skip',
+    pick:aPlus?'Adjustable front + rear if the car offers it':'Usually skip at this class',
+    why:aPlus
+      ?'From A class up, downforce becomes the main handling lever and is worth real PI.'
+      :'Below A class the drag penalty typically costs more down the straights than the downforce returns in the corners.',
+    unlock:aPlus?'Front and rear downforce sliders — only if the kit is actually adjustable.':null}
+  ];
+}
+
+function driftPath(i){
+  return [
+   {n:'Drivetrain', tag:'must', pick:'RWD — swap if the car is not already',
+    why:'Drift requires rear drive. Nothing else in this list matters until that is true.'},
+   {n:'Tires', tag:'must', pick:'Drift compound — or Sport run at low pressure',
+    why:'Race slicks grip too hard to break loose cleanly. Drift tires are purpose-built; Sport at low pressure is the cheap alternative.',
+    unlock:'Tire pressure is adjustable regardless.'},
+   {n:'Suspension', tag:'must', pick:'Race springs and dampers', why:'Needed for the soft-front / stiff-rear split the tune calls for.',
+    unlock:'Spring rate, ride height, damping, alignment.'},
+   {n:'Differential', tag:'must', pick:'Drift or Race differential',
+    why:'The tune runs 90–100% accel lock for near-welded behaviour — that is what holds an angle instead of lighting one wheel.',
+    unlock:'Accel and decel lock.'},
+   {n:'Anti-roll bars', tag:'must', pick:'Race anti-roll bars',
+    why:'The stiff-rear / soft-front bar split is what makes the car rotate willingly and hold it.',
+    unlock:'Front and rear ARB sliders.'},
+   {n:'Brakes', tag:'high', pick:'Race brakes', why:'Needed for controlled entry and any brake-initiated transition.',
+    unlock:'Balance and pressure.'},
+   {n:'Weight reduction', tag:'high', pick:'Maximise it',
+    why:'A lighter car changes direction faster and is far less punishing to catch when a transition goes wrong.'},
+   {n:'Transmission', tag:'opt', pick:'4–5 gears, geared long',
+    why:'Long gearing keeps you in the usable band through a transition. Six or more gears wastes PI and adds shifts you do not want mid-corner.',
+    unlock:'Final drive (Sport) or full ratios and gear count (Race).'},
+   {n:'Power', tag:'fill', pick:'Mid power — many of the strongest builds sit around 700–900 hp',
+    why:'This is the one road discipline where max power is usually wrong. Control beats output; past a point extra power just costs you angle discipline.',
+    watch:'If the car snaps rather than holds, you have too much power for the grip, not too little lock.'},
+   {n:'Aero', tag:'skip', pick:'Skip it', why:'Downforce fights the slip angle you are trying to sustain.'}
+  ];
+}
+
+function dragPath(i){
+  return [
+   {n:'Drivetrain', tag:'high', pick:'AWD for launch, if the PI cost is bearable',
+    why:'Drag is decided in the first seconds. AWD puts power down off the line in a way RWD cannot, and this is the one discipline where that trade is usually worth it.'},
+   {n:'Tires', tag:'must', pick:'Drag slicks',
+    why:'Purpose-built for straight-line launch traction. Nothing else comes close off the line.',
+    unlock:'Tire pressure — the tune runs the rear soft and the front near the cap.'},
+   {n:'Power', tag:'must', pick:'Maximum — power leads here',
+    why:'This is the single exception to build-grip-first. In a straight line power is the product; everything else exists to deliver it.',
+    watch:'Power-to-weight is the number that matters. Keep buying until the class ceiling stops you.'},
+   {n:'Transmission', tag:'must', pick:'Race transmission — 6 gears is the standard baseline, more only if the powerband needs the spread',
+    why:'Ratio control is how you keep the engine in its band for the whole run. Very high-power builds can justify 8–10 gears; most do not need them, and each extra gear is PI plus a shift that costs time.',
+    unlock:'Final drive, individual ratios, gear count.'},
+   {n:'Differential', tag:'must', pick:'Race differential',
+    why:'Near-locked accel puts both wheels down together instead of spinning the unloaded one.',
+    unlock:'Accel and decel lock' + (i.dt==='AWD'?', plus centre split.':'.')},
+   {n:'Weight reduction', tag:'high', pick:'Take what you can get',
+    why:'Still helps — acceleration and launch both scale with mass — but here it supports the power rather than leading.'},
+   {n:'Suspension', tag:'opt', pick:'Race springs and dampers',
+    why:'Not for cornering — for launch. Controlling squat and keeping the driven axle loaded is what the tune uses it for.',
+    unlock:'Spring rate, ride height, damping.'},
+   {n:'Brakes', tag:'opt', pick:'Race brakes if PI is spare',
+    why:'You still have to stop at the end. Low priority for PI, but do not run stock if you can help it.'},
+   {n:'Aero', tag:'skip', pick:'None, or minimum',
+    why:'Downforce is drag, and drag costs trap speed. On a strip that is a straight loss.'}
+  ];
+}
+
+function loosePath(i){
+  const cc=i.disc==='cc';
+  return [
+   {n:'Drivetrain', tag:'must', pick:'AWD — effectively mandatory',
+    why:'On loose surfaces putting power through all four wheels is the difference between driving and steering a slide you did not choose.'},
+   {n:'Tires', tag:'must', pick:cc?'Off-road tires, maximum width':'Rally tires — non-negotiable',
+    why:cc?'Off-road compound and width are what let the car survive rough terrain at speed.'
+          :'Slicks are slower on dirt no matter what the PI saving looks like. This is not a budget decision.',
+    unlock:'Tire pressure — the tune runs these low.'},
+   {n:'Suspension', tag:'must', pick:cc?'Off-road suspension':'Rally suspension',
+    why:cc?'Off-road suspension gives the ride-height range cross-country needs. The tune runs it at maximum.'
+          :'Rally suspension\'s ride-height window sits entirely above race suspension\'s — race springs cannot reach the height a dirt build needs.',
+    unlock:'Spring rate, ride height, damping, alignment.'},
+   {n:'Differential', tag:'must', pick:cc?'Off-road or Race differential':'Rally or Race differential',
+    why:'On loose surfaces the diff does much of the balance work that anti-roll bars do on tarmac.',
+    unlock:'Accel and decel lock, plus centre split.'},
+   {n:'Anti-roll bars', tag:'high', pick:'Race bars — but run them soft',
+    why:'You still want the adjustability, you just use very little of it. The tune keeps both bars near minimum so the suspension can actually work over rough ground.',
+    unlock:'Front and rear ARB sliders.'},
+   {n:'Brakes', tag:'high', pick:'Race brakes', why:'Stock brakes lock even more readily on loose surfaces.',
+    unlock:'Balance and pressure.'},
+   {n:'Weight reduction', tag:cc?'opt':'high',
+    pick:cc?'Some — but do not chase it':'Worth taking',
+    why:cc?'Cross-country rewards stability and composure over rough ground more than raw lightness.'
+          :'Lighter cars change direction faster between corners, which is most of a rally stage.'},
+   {n:'Transmission', tag:'opt', pick:'Shorter final drive than a road build' + (cc?' — shorter still than dirt rally':''),
+    why:cc?'Cross-country is technical and slow-speed; you want acceleration out of every obstacle, not top speed.'
+          :'Dirt stages live in the low and mid gears. Trade top speed for drive out of corners.',
+    unlock:'Final drive (Sport) or full ratios (Race).'},
+   {n:'Power', tag:'fill', pick:'Fill the remaining PI',
+    why:'Traction limits how much power you can actually use on loose ground, so this matters less here than on tarmac. Get the chassis right first.'},
+   {n:'Aero', tag:'skip', pick:'Skip it', why:'Downforce needs speed and smooth ground. Neither is reliably available here.'}
+  ];
+}
+
+function buildPlan(i){
+  const steps = i.disc==='drift' ? driftPath(i)
+              : i.disc==='drag'  ? dragPath(i)
+              : (i.disc==='rally'||i.disc==='cc') ? loosePath(i)
+              : tarmacPath(i);
+
+  /* ---- qualitative viability flags — structural only, no invented thresholds ---- */
+  const f=[], W=i.wt, hi=['S1','S2','R','X'].includes(i.cls),
+        aPlus=['A','S1','S2','R','X'].includes(i.cls),
+        grip=['road','sprint','touge'].includes(i.disc);
+
+  if(i.disc==='drift'&&i.dt!=='RWD')
+    f.push('<b>Drivetrain blocks this build.</b> Drift needs RWD. Budget the swap before anything else, or pick a different car.');
+  if(['rally','cc'].includes(i.disc)&&i.dt!=='AWD')
+    f.push('<b>Drivetrain is a real handicap here.</b> '+DISC[i.disc].n+' is effectively an AWD-only discipline. Plan the swap in, or expect to be uncompetitive regardless of how well it is tuned.');
+  if(i.dt==='FWD'&&hi)
+    f.push('<b>FWD at '+i.cls+' is a steep climb.</b> Past a certain power level the front axle cannot both steer and deliver, and no tune fixes that. If the car allows a RWD or AWD conversion, that is likely worth more than any other single purchase.');
+  else if(i.dt==='FWD'&&grip&&i.cls==='A')
+    f.push('<b>FWD at A class for '+DISC[i.disc].n+'</b> will fight power-on understeer on exit. Workable, but expect to spend diff and ARB adjustment on it and to give up some exit speed.');
+  if(W>=4200&&grip&&aPlus)
+    f.push('<b>This car is heavy for a handling class.</b> At '+W+' lb in '+i.cls+' for '+DISC[i.disc].n+', weight reduction will not close the gap to a purpose-built rival — mass hurts cornering, braking and direction change all at once. It can still be a good car to drive; it is unlikely to be the fastest choice.');
+  if(W>=4000&&i.disc==='drift')
+    f.push('<b>Heavy for drift.</b> At '+W+' lb transitions will be slow to initiate and punishing to catch. Prioritise weight reduction hard.');
+  if(i.dt==='RWD'&&i.disc==='drag')
+    f.push('<b>RWD on a drag build gives up the launch.</b> If an AWD swap is available it usually pays for its PI here — this is the discipline where that trade makes the most sense.');
+  if(W<=1900&&['S2','R','X'].includes(i.cls))
+    f.push('<b>Very light car at '+i.cls+'.</b> Getting to this class means a lot of power in very little mass — expect it to be traction-limited and nervous. Grip and downforce will matter more than the next power upgrade.');
+
+  /* ---- reference points from your own finished builds ---- */
+  const peers=libLoad().filter(b=>b.cls===i.cls&&b.disc===i.disc&&b.hp&&b.wt);
+
+  return {steps,flags:f,peers};
+}
+
+const cl=(v,a,b)=>Math.min(b,Math.max(a,v));
+const h5=v=>Math.round(v*2)/2;
+
+/* format a value for display using its metadata */
+function fmt(k,v){
+  if(v==null) return '';
+  const m=VMETA[k];
+  return (m.sign&&v>0?'+':'')+v.toFixed(m.d);
+}
+/* snap to the game's real increment and clamp to legal range
+   (the toFixed round-trip keeps float noise out of stored values) */
+function snap(k,v){
+  const m=VMETA[k];
+  return +cl(Math.round(v/m.s)*m.s, m.lo, m.hi).toFixed(m.d);
+}
+
+let BASE=null;   // computed baseline (compute() result)
+let ADJ={};      // user/fix overrides, keyed like VMETA
+let LOG=[];      // [{l:label, c:[{k,from,to}]}]
+let VIEW='none'; // which panel #out is currently showing
+
+const eff=k=> (ADJ[k]!==undefined ? ADJ[k] : (BASE ? BASE.v[k] : null));
+
+/* ===================== BUILD LIBRARY =====================
+   Every calculated build is saved, keyed by car + class + discipline so
+   re-tuning the same build updates rather than duplicates. This is the only
+   honest route to real class-viability data: it's your own finished builds,
+   not a scraped table or a guess. */
+const LIB_KEY='fh6lib';
+function libLoad(){ try{ return JSON.parse(localStorage.getItem(LIB_KEY)||'[]'); }catch(e){ return []; } }
+function libStore(a){ try{ localStorage.setItem(LIB_KEY,JSON.stringify(a)); }catch(e){} }
+function libKey(i){ return (i.name||'untitled').toLowerCase().trim()+'|'+i.cls+'|'+i.disc; }
+function libAdd(i,PI){
+  const a=libLoad(), k=libKey(i);
+  const e={k,PI,ts:Date.now()};
+  FIELDS.forEach(f=>e[f]=i[f]);
+  e.name=i.name||'Untitled';
+  const ix=a.findIndex(x=>x.k===k);
+  if(ix>-1) a[ix]=e; else a.push(e);
+  libStore(a);
+}
+const hpk=(hp,wt)=>Math.round(hp/wt*1000);   // hp per 1000 lb (compute() has its own local pw)
+
+function compute(i){
+  const d=DISC[i.disc], PI=PI_CEIL[i.cls], W=i.wt, fp=i.fw/100;
+
+  /* ---- SPRINGS: K = M(2πf)², absolute lbs/in — no slider range needed ---- */
+  let f=6.79e-7*Math.pow(PI-100,2)+2.45;
+  if(i.aero==='both') f*=1.04; else if(i.aero==='rear') f*=1.02;
+  const sprung=0.85, LB_KG=2.20462, NM_LBIN=175.126835;
+  const cm=s=>(W*s/2)*sprung/LB_KG;                        // corner sprung mass, kg
+  const rate=(m,fq)=>m*Math.pow(2*Math.PI*fq,2)/NM_LBIN;   // lbs/in
+  const spF=rate(cm(fp),   f*d.fF);
+  const spR=rate(cm(1-fp), f*d.fR);
+
+  /* ---- DAMPING: from critical damping C = 2√(KM) ∝ corner mass × frequency.
+         Since spring K already ∝ M·f², damper need scales as mass × freq — so
+         heavier and stiffer-sprung corners get higher 1-20 values, and the F/R
+         split follows corner weight the same way the springs do. zF/zR act as
+         discipline character multipliers around the 0.62 road norm.
+         Calibrated so a ~3000 lb A-class road car lands near the community
+         (HokiHoshi) baseline of ~10.5 rebound at 50/50. ---- */
+  const off=(i.disc==='rally'||i.disc==='cc')?1.0:0;
+  const damp=(m,fq,z)=>cl(0.0135*m*fq*(z/0.62)+off,1,20);
+  const reF=damp(cm(fp),  f*d.fF, d.zF), reR=damp(cm(1-fp), f*d.fR, d.zR);
+
+  /* ---- ARBs: 1-65. Base split PROPORTIONAL to axle load (community-standard
+         HokiHoshi method: stiffer bar on the heavier axle = neutral roll
+         stiffness, NOT understeer). Discipline aF/aR then trim toward rotation
+         to land Mechanical Balance in the 0.55-0.65 window. ---- */
+  const ab=24+(W-2500)*0.0045;
+  const arF=ab*2*fp*d.aF, arR=ab*2*(1-fp)*d.aR;
+
+  /* ---- TIRE PRESSURE ---- */
+  let pF,pR;
+  if(i.disc==='drag'){ pF=50; pR=15; }   // front near cap = less rolling resistance; rear soft for launch
+  else{
+    const base=PSI[i.tire]+(W-2200)/800;
+    const sp={RWD:0.75,FWD:1.5,AWD:0.2}[i.dt];
+    pF=base+sp/2; pR=base-sp/2;
+  }
+
+  /* ---- ALIGNMENT ---- */
+  const camF=d.camF-(i.fw-50)*0.012, camR=d.camR+(i.fw-50)*0.008;
+
+  /* ---- BRAKES ---- */
+  const wd=(i.twr&&i.twf)?(i.twr-i.twf):0;
+  const bal=cl(i.fw-wd*0.15,44,60);
+
+  /* ---- DIFF ---- */
+  let ac=cl(62-(i.tq-300)/20+(W-3000)/200,25,80);
+  if(i.disc==='drift')ac=92; else if(i.disc==='drag')ac=95;
+  else if(i.disc==='rally')ac=cl(ac*0.85,20,70); else if(i.disc==='cc')ac=cl(ac*0.80,20,70);
+  const dec=d.dec;
+  let dfa=null,dfd=null,dra=null,drd=null,dc=null;
+  if(i.dt==='AWD'){
+    dfa=ac*0.55; dfd=0; dra=ac; drd=dec;
+    dc=(i.disc==='rally')?52:(i.disc==='cc'||i.disc==='drag')?50:cl(55+(i.fw-50)*0.8,50,70);
+  } else if(i.dt==='FWD'){
+    dfa=cl(ac*0.75,20,60); dfd=Math.min(dec,10);
+  } else { dra=ac; drd=dec; }
+
+  /* ---- GEARING ---- */
+  const pw=i.hp/W*1000;
+  const fd=cl(d.fd*Math.pow(100/pw,0.12)*(1+(i.gr-6)*0.03),2.20,6.00);
+
+  /* ---- AERO ---- */
+  let aeF=null,aeR=null;
+  if(i.aero!=='none'&&i.disc!=='drag'){
+    aeF=(i.aero==='both')?d.aeF:null;
+    aeR=cl(d.aeF+(i.fw-47)*1.5,20,100);
+  }
+
+  /* ---- WARNINGS (R7) ---- */
+  const w=[];
+  const g=i.gr, road=['road','sprint','touge'].includes(i.disc);
+  if(i.disc==='drift'&&g>=6) w.push('<b>Gear count:</b> '+g+'-speed on a drift build wastes PI and complicates momentum management. 4&ndash;5 speed is ideal.');
+  if(i.disc==='touge'&&g>=8) w.push('<b>Gear count:</b> '+g+'-speed on touge &mdash; tight passes never use the spread and it costs PI. Recommend 6&ndash;7.');
+  else if(road&&g>=8&&['D','C','B','A'].includes(i.cls)) w.push('<b>Gear count:</b> '+g+'-speed on a '+i.cls+' class road build is overkill &mdash; 8&ndash;10 gears only earn their PI on high-power S1/S2/R. Recommend 6&ndash;7.');
+  if(road&&g===4) w.push('<b>Gear count:</b> 4-speed is short for '+DISC[i.disc].n+'. 6&ndash;7 recommended (5 acceptable on low power).');
+  if(i.disc==='rally'&&i.susp==='Race') w.push('<b>Suspension:</b> Race suspension on a dirt build &mdash; rally suspension ride-height window sits entirely above race. Values below assume the rally window.');
+  if(i.disc==='cc'&&i.susp!=='Off-road') w.push('<b>Suspension:</b> Cross-country wants off-road suspension for the ride-height range.');
+  if(i.disc==='rally'&&!['rally','offroad'].includes(i.tire)) w.push('<b>Tires:</b> Rally tires are non-negotiable on dirt &mdash; slicks lose more to grip than they save in PI.');
+  if(i.disc==='cc'&&i.tire!=='offroad') w.push('<b>Tires:</b> Cross-country needs off-road tires, max width.');
+  if(['rally','cc'].includes(i.disc)&&i.dt!=='AWD') w.push('<b>Drivetrain:</b> AWD is effectively mandatory for '+DISC[i.disc].n+'.');
+  if(i.disc==='drift'&&i.dt!=='RWD') w.push('<b>Drivetrain:</b> Drift builds require RWD.');
+
+  // snap everything to legal in-game increments up front
+  const raw={pF,pR,fd,camF,camR,toeF:d.toeF,toeR:d.toeR,cast:d.cast,arF,arR,spF,spR,
+             rhF:d.rhF,rhR:d.rhR,reF,reR,buF:reF*0.63,buR:reR*0.63,aeF,aeR,
+             bal,pres:100,dfa,dfd,dra,drd,dc};
+  const v={};
+  for(const k in raw) v[k]= raw[k]==null ? null : snap(k,raw[k]);
+
+  return {i,d,PI,f,w,v,gears:SPREAD[i.gr]};
+}
+
+/* ===================== ADJUSTMENT ENGINE ===================== */
+function applyDeltas(deltas,label){
+  const changes=[];
+  for(const [k,amt,mode] of deltas){
+    const cur=eff(k);
+    if(cur==null) continue;                       // param not present on this build
+    const nv=snap(k, mode==='m' ? cur*(1+amt) : cur+amt);
+    if(Math.abs(nv-cur)<1e-9) continue;           // already at a limit
+    ADJ[k]=nv;
+    changes.push({k,from:cur,to:nv});
+  }
+  if(!changes.length) return false;
+  // keep bump chained to rebound unless bump was set by hand
+  for(const ax of ['F','R']){
+    if(changes.some(c=>c.k==='re'+ax) && ADJ['bu'+ax]===undefined){
+      const nb=snap('bu'+ax, eff('re'+ax)*0.63), ob=eff('bu'+ax);
+      if(Math.abs(nb-ob)>1e-9){ ADJ['bu'+ax]=nb; changes.push({k:'bu'+ax,from:ob,to:nb,auto:1}); }
+    }
+  }
+  LOG.push({l:label,c:changes});
+  return true;
+}
+
+function renderLog(){
+  const el=document.getElementById('log');
+  if(!LOG.length){ el.style.display='none'; el.innerHTML=''; return; }
+  el.style.display='';
+  el.innerHTML=LOG.map((e,n)=>'<div class="e"><b>'+(n+1)+'. '+e.l+'</b> &mdash; '+
+    e.c.map(c=>'<code>'+VMETA[c.k].n+' '+fmt(c.k,c.from)+'&rarr;'+fmt(c.k,c.to)+
+      (c.auto?' (auto)':'')+'</code>').join(', ')+'</div>').join('');
+}
+
+/* ===================== RENDER ===================== */
+function vin(k){
+  const v=eff(k); if(v==null) return '';
+  const m=VMETA[k], mod=ADJ[k]!==undefined?' mod':'';
+  return '<input class="vi'+mod+'" data-k="'+k+'" value="'+fmt(k,v)+'">'+
+         (m.u?'<span class="u">'+m.u+'</span>':'');
+}
+function sec(c,t,rows,note,extra){
+  return '<div class="sec" style="--c:'+c+'"><h3>'+t+'</h3><div class="body"><div class="kv">'+
+    rows.map(r=>'<div class="k">'+r[0]+'</div><div class="v">'+r[1]+'</div>').join('')+
+    '</div>'+(extra||'')+(note?'<div class="note">'+note+'</div>':'')+'</div></div>';
+}
+
+function render(){
+  const r=BASE, {i,d}=r, R=[];
+
+  R.push(sec('var(--tire)','Tires',[['Front',vin('pF')],['Rear',vin('pR')]],
+    i.disc==='drag'
+      ? 'Front runs near the 55 psi cap &mdash; a hard skinny front tire cuts rolling resistance and nothing up front needs grip. Rear stays soft (~15) to maximize the contact patch on launch. If the rear spins through 1st&ndash;2nd, drop another 0.5.'
+      : '<b>Verify in-game:</b> warm target 32&ndash;34 psi on the tire-temp telemetry screen. Red/overheating &rarr; raise 0.5. Staying blue &rarr; lower 0.5.'));
+
+  R.push(sec('var(--gear)','Gearing',[['Final Drive',vin('fd')]],
+    '<b>Starting estimate only &mdash; dial in-game.</b> Move the final drive slider until the power curve just reaches the edge of the speed graph, then confirm on track that the car just touches the limiter in top gear at the end of the longest straight. Bouncing off the limiter early &rarr; lower final drive. Weak corner exit &rarr; raise it.<br><br><b>Leave individual gear ratios at the race-transmission default</b> (shown for reference). Final drive scales all gears together &mdash; do not respace them.',
+    '<div class="gears">'+r.gears.map((g,n)=>'<div class="g"><span>'+(n+1)+(n===0?'st':n===1?'nd':n===2?'rd':'th')+'</span><span>'+g.toFixed(2)+'</span></div>').join('')+'</div>'));
+
+  R.push(sec('var(--align)','Alignment',[
+    ['Camber Front',vin('camF')],['Camber Rear',vin('camR')],
+    ['Toe Front',vin('toeF')],['Toe Rear',vin('toeR')],['Caster',vin('cast')]],
+    'Negative toe = toe-in, positive = toe-out (FH6 notation). <b>Camber check:</b> tires should heat evenly on exit &mdash; outer hotter &rarr; more negative, inner hotter &rarr; toward zero.'));
+
+  R.push(sec('var(--arb)','Antiroll Bars',[['Front',vin('arF')],['Rear',vin('arR')]],
+    'Split proportional to axle load (stiffer bar on the heavier axle = neutral roll stiffness), then trimmed toward rotation. <b>Target Mechanical Balance 0.55&ndash;0.65 in-game (0.60 sweet spot).</b> Below 0.55 = understeer, above 0.65 = instability. Soften the end with the problem rather than stiffening the strong end &mdash; roughly &plusmn;0.5 ARB per 1% of balance shift.'));
+
+  R.push(sec('var(--spring)','Springs',[
+    ['Spring Front',vin('spF')],['Spring Rear',vin('spR')],
+    ['Ride Height Front',vin('rhF')],['Ride Height Rear',vin('rhR')]],
+    'Rates are absolute values from <b>K = M(2&pi;f)&sup2;</b> at '+r.f.toFixed(2)+' Hz base &mdash; type them straight in, the game clamps to the car\'s range if it\'s narrower. F/R ratio is already set by corner mass, so no weight-distribution correction is needed on top. Ride height is a position in the slider\'s range &mdash; 0% = minimum.<br><br><b>Ride height check:</b> if the Springs telemetry bars hit max (97%+) repeatedly over bumps or curbs, raise 1&ndash;2 clicks. Never close to bottoming &rarr; minimum is correct.'));
+
+  R.push(sec('var(--damp)','Damping',[
+    ['Rebound Front',vin('reF')],['Rebound Rear',vin('reR')],
+    ['Bump Front',vin('buF')],['Bump Rear',vin('buR')]],
+    'Scaled from critical damping (2&radic;KM) &mdash; heavier, stiffer-sprung corners need more damper, so values track corner weight like the springs do. Bump held at 0.63 &times; rebound (edit rebound and bump follows; edit bump directly and it stops following). Diving/bouncy &rarr; bump too soft. Skipping or telemetry spikes to 100 &rarr; bump too stiff. Roll oscillation or oversteer on turn-in &rarr; rebound too soft; understeer on turn-in &rarr; too stiff.'));
+
+  if(eff('aeF')!=null||eff('aeR')!=null){
+    const rows=[];
+    if(eff('aeF')!=null)rows.push(['Front',vin('aeF')]);
+    if(eff('aeR')!=null)rows.push(['Rear',vin('aeR')]);
+    R.push(sec('var(--aero)','Aero',rows,
+      i.aero==='both'
+        ? 'Set front to its position, then adjust rear until the in-game <b>Aero Balance reads 0.40&ndash;0.45</b>. The balance reading is the real target &mdash; do not chase absolute lbs.'
+        : '<b>Rear aero only.</b> With a fixed front, the in-game balance figure is not a reliable target &mdash; trust mechanical balance from diff, ARB and springs instead.'));
+  } else {
+    R.push(sec('var(--aero)','Aero',[['&mdash;','No aero']],
+      i.disc==='drag'?'Drag build &mdash; minimal/no aero, downforce costs trap speed.'
+      :'No adjustable aero on this build. Below A class the drag penalty usually outweighs the downforce anyway.'));
+  }
+
+  R.push(sec('var(--brake)','Braking',[['Balance',vin('bal')],['Pressure',vin('pres')]],
+    'Derived from front weight distribution'+((i.twf&&i.twr)?' and tire width delta':'')+'. Rear slides on entry &rarr; more front bias. Understeer on turn-in &rarr; nudge toward rear. Drop pressure 5&ndash;10% only if you get lockup.'));
+
+  const dr=[];
+  if(i.dt==='AWD'){
+    dr.push(['Front Accel',vin('dfa')],['Front Decel',vin('dfd')],
+            ['Rear Accel',vin('dra')],['Rear Decel',vin('drd')],['Center',vin('dc')]);
+  } else if(i.dt==='FWD'){ dr.push(['Accel',vin('dfa')],['Decel',vin('dfd')]); }
+  else { dr.push(['Accel',vin('dra')],['Decel',vin('drd')]); }
+  R.push(sec('var(--diff)','Differential',dr,
+    (i.dt==='AWD'?'<b>Front decel is 0% by design</b> &mdash; high front decel locks the front axle under braking, kills trail-braking and causes entry understeer. Only raise it for a specific problem (front wheelspin under braking, extreme power, very rear-heavy car). Center above 50% = rear bias.<br><br>':'')+
+    'Accel scaled to torque and weight &mdash; higher torque needs less lock for the same rotation, and a lighter car rotates more on the same value. <b>Decel deliberately kept low</b>; raise it only from real handling feedback, never as a stability buffer.'));
+
+  const nMod=Object.keys(ADJ).length;
+  const hd='<div class="panel" style="margin-bottom:9px"><div class="hd">'+
+    '<div class="nm">'+(i.name||'Untitled')+'</div>'+
+    '<div class="mt">'+i.cls+' '+r.PI+' &middot; '+d.n+' &middot; '+i.dt+' &middot; '+
+    i.wt+' lb &middot; '+i.fw+'% F &middot; '+i.hp+' hp / '+i.tq+' lb-ft</div></div>'+
+    '<div style="color:var(--dim);font-size:12px">'+TIRE_N[i.tire]+' tires &middot; '+
+    i.susp+' suspension &middot; '+i.gr+'-speed &middot; '+i.asp+
+    (nMod?' &middot; <span style="color:var(--mod)">'+nMod+' adjusted from baseline</span>':'')+
+    '</div></div>';
+
+  const warns=r.w.map(x=>'<div class="warn">'+x+'</div>').join('');
+  document.getElementById('out').innerHTML=hd+warns+R.join('');
+}
+
+/* ===================== PLAN + LIBRARY VIEWS ===================== */
+const TAGTXT={must:'Required',high:'High value',fill:'Fill',opt:'Situational',skip:'Skip'};
+
+function renderPlan(i){
+  const p=buildPlan(i), PI=PI_CEIL[i.cls];
+
+  const hd='<div class="panel" style="margin-bottom:9px"><div class="hd">'+
+    '<div class="nm">'+(i.name||'Untitled')+' &mdash; Build Plan</div>'+
+    '<div class="mt">target '+i.cls+' '+PI+' &middot; '+DISC[i.disc].n+' &middot; '+i.dt+'</div></div>'+
+    '<div style="color:var(--dim);font-size:12px">Buy in this order. The game shows PI, power-to-weight and weight deltas live on Buy &amp; Install &mdash; this is the order and the stop condition it never gives you.</div></div>';
+
+  const flags=p.flags.map(x=>'<div class="flag">'+x+'</div>').join('');
+
+  let ctx='<div class="ctx"><b>Current entry:</b> '+i.hp+' hp / '+i.wt+' lb &nbsp;&rarr;&nbsp; <span class="pw">'+
+    hpk(i.hp,i.wt)+'</span> hp per 1000 lb';
+  if(p.peers.length){
+    ctx+='<br><br><b>Your finished '+i.cls+' '+DISC[i.disc].n+' builds</b> for reference '+
+      '<span style="opacity:.7">(your own data, not a rule)</span>:<br>'+
+      p.peers.slice(-5).map(b=>'<span class="peer">'+b.name+' &mdash; '+b.hp+' hp / '+b.wt+
+        ' lb &middot; '+hpk(b.hp,b.wt)+' hp/1000lb &middot; '+b.dt+'</span>').join('<br>');
+  } else {
+    ctx+='<br><br><span style="opacity:.75">No finished builds saved in this class and discipline yet. Once you tune a few, they show up here as reference points.</span>';
+  }
+  ctx+='</div>';
+
+  const steps=p.steps.map((s,n)=>'<div class="step">'+
+    '<div class="sh"><div class="num">'+(n+1)+'</div><div class="nm">'+s.n+'</div>'+
+    '<div class="tag '+s.tag+'">'+TAGTXT[s.tag]+'</div></div>'+
+    '<div class="sb"><span class="pick">'+s.pick+'</span>'+s.why+
+    (s.watch?'<div class="watch"><b style="color:#c8d2e4">On Buy &amp; Install:</b> '+s.watch+'</div>':'')+
+    (s.unlock?'<div class="unlock"><b>Unlocks:</b> '+s.unlock+'</div>':'')+
+    '</div></div>').join('');
+
+  const decisions='<div class="sec" style="--c:var(--acc)"><h3>Decisions, not steps</h3>'+
+    '<div class="body"><div class="note" style="margin:0;padding:0;border:0">'+
+    SWAP_NOTE+'<br><br>'+drivetrainNote(i)+'<br><br>'+WIDEBODY_NOTE+
+    '<br><br><b>Stop condition:</b> build to the '+i.cls+' ceiling of '+PI+' PI. Leaving PI unspent is leaving performance on the table &mdash; a throttle-limited car at '+(PI+5)+' loses to a proper build at '+PI+'.'+
+    '</div></div></div>';
+
+  const caveat='<div class="sec" style="--c:#6a7180"><h3>What this does not do</h3>'+
+    '<div class="body"><div class="note" style="margin:0;padding:0;border:0">'+
+    'No predicted PI, weight or horsepower numbers appear anywhere above, and that is deliberate. Forza derives PI from a simulated lap rather than a formula, so no tool can honestly tell you what PI a set of parts will land on &mdash; and no public dataset exposes per-part weight or power deltas. The Buy &amp; Install screen shows all of it live as you hover. Use this for sequence and priority; use the game for numbers.'+
+    '</div></div></div>';
+
+  document.getElementById('out').innerHTML=hd+flags+ctx+steps+decisions+caveat;
+}
+
+function drivetrainNote(i){
+  if(i.dt==='AWD') return '<b>Drivetrain:</b> if this car came AWD from the factory (GT-R, Evo, STI, quattro, xDrive), leave it alone &mdash; converting native AWD to RWD is usually a bad trade. If this is a swapped AWD, remember it costs PI and adds understeer you then tune out through the diff and bars.';
+  if(i.dt==='RWD') return '<b>Drivetrain:</b> RWD is the better PI value through most classes and is required for drift. Reserve an AWD swap for cases where the PI actually pays for itself &mdash; launch-limited builds and loose surfaces.';
+  return '<b>Drivetrain:</b> FWD is PI-cheap but caps what the car can do once power climbs. A RWD conversion preserves chassis feel and usually pays for itself from B class up; AWD if the discipline rewards launch.';
+}
+
+function renderLib(){
+  const a=libLoad().slice().sort((x,y)=>y.ts-x.ts);
+  const hd='<div class="panel" style="margin-bottom:9px"><div class="hd">'+
+    '<div class="nm">Build Library</div><div class="mt">'+a.length+' saved</div></div>'+
+    '<div style="color:var(--dim);font-size:12px">Every build you calculate is saved here automatically, keyed by car + class + discipline. Load one to put its stat block back in the form.</div></div>';
+  if(!a.length){
+    document.getElementById('out').innerHTML=hd+
+      '<div class="panel empty">Nothing saved yet. Calculate a tune and it lands here.</div>';
+    return;
+  }
+  document.getElementById('out').innerHTML=hd+a.map(b=>{
+    const id=encodeURIComponent(b.k);   // stable key, not a positional index
+    return '<div class="libitem"><div>'+
+    '<div class="t">'+b.name+'</div><div class="s">'+b.cls+' '+b.PI+' &middot; '+DISC[b.disc].n+
+    ' &middot; '+b.dt+'<br>'+b.hp+' hp / '+b.tq+' lb-ft &middot; '+b.wt+' lb &middot; '+b.fw+'% F &middot; '+
+    hpk(b.hp,b.wt)+' hp/1000lb<br>'+TIRE_N[b.tire]+' &middot; '+b.gr+'-speed &middot; '+b.susp+' susp</div></div>'+
+    '<div class="acts"><button class="ld" data-load="'+id+'">Load</button>'+
+    '<button class="dl" data-del="'+id+'">Delete</button></div></div>';
+  }).join('');
+}
+
+/* ===================== SHEET EXPORT =====================
+   Renders the saved card from the FH6 tune-card template. Kept deliberately
+   separate from the on-page view: the page is a working surface (editable,
+   with coaching notes), the sheet is the finished artifact you read while
+   typing values into the game. */
+
+const SHEET_CSS=`
+  @import url('https://fonts.googleapis.com/css2?family=Barlow:wght@400;500;600;700;800&family=Barlow+Condensed:wght@400;600;700;800&display=swap');
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  html, body {
+    background: #0A0A0A;
+    color-scheme: dark;
+    font-family: 'Barlow', sans-serif;
+    padding: 32px 16px;
+    min-height: 100vh;
+  }
+
+  .card {
+    max-width: 680px;
+    margin: 0 auto;
+    background: #111111;
+    border: 1px solid #1E1E1E;
+  }
+
+  /* ── HEADER ── */
+  .header {
+    padding: 22px 28px 0;
+    position: relative;
+    overflow: hidden;
+    background: #0D0D0D;
+    border-bottom: 2px solid #282828;
+  }
+
+  .watermark {
+    position: absolute;
+    top: 2px;
+    right: 18px;
+    font-family: 'Barlow Condensed', sans-serif;
+    font-size: 80px;
+    font-weight: 800;
+    color: #181818;
+    letter-spacing: -2px;
+    line-height: 1;
+    user-select: none;
+  }
+
+  .header-top { position: relative; z-index: 1; }
+
+  .header-sheet-label {
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    color: #5A5A5A;
+    margin-bottom: 6px;
+  }
+
+  .car-name {
+    font-family: 'Barlow Condensed', sans-serif;
+    font-size: 30px;
+    font-weight: 800;
+    letter-spacing: 0.03em;
+    text-transform: uppercase;
+    color: #F5F5F5;
+    line-height: 1;
+  }
+
+  .car-sub {
+    font-size: 11px;
+    font-weight: 500;
+    color: #6A6A6A;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    margin-top: 5px;
+  }
+
+  .badges {
+    display: flex;
+    gap: 6px;
+    margin-top: 10px;
+    flex-wrap: wrap;
+    align-items: center;
+  }
+
+  .badge-pi, .badge-tag {
+    border: 2px solid #E8193C;
+    color: #E8193C;
+    font-family: 'Barlow Condensed', sans-serif;
+    font-size: 13px;
+    font-weight: 700;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    padding: 2px 9px;
+    background: none;
+    white-space: nowrap;
+  }
+
+  /* ── STATS STRIP ── */
+  .stats-strip {
+    display: flex;
+    justify-content: center;
+    padding: 14px 28px 20px;
+    background: #0D0D0D;
+  }
+
+  .stats-inner { display: flex; gap: 6px; flex-wrap: wrap; justify-content: center; }
+
+  .stat-block {
+    background: #161616;
+    border: 1px solid #222222;
+    padding: 8px 20px 10px;
+    text-align: center;
+  }
+
+  .stat-label {
+    font-size: 9px;
+    font-weight: 700;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: #6A6A6A;
+  }
+
+  .stat-number {
+    font-family: 'Barlow Condensed', sans-serif;
+    font-size: 24px;
+    font-weight: 800;
+    color: #F5F5F5;
+    line-height: 1;
+    margin-top: 4px;
+  }
+
+  .stat-unit {
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: #6A6A6A;
+    margin-top: 2px;
+  }
+
+  /* ── SECTIONS ── */
+  .section { border-bottom: 1px solid #181818; }
+
+  .section-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    background: #161616;
+    padding: 7px 20px;
+    border-bottom: 1px solid #1E1E1E;
+    border-left: 3px solid transparent;
+  }
+
+  .sec-tires   { border-left-color: #4F9EFF; }
+  .sec-tires   .section-title { color: #4F9EFF; }
+  .sec-gearing { border-left-color: #FF8A3D; }
+  .sec-gearing .section-title { color: #FF8A3D; }
+  .sec-align   { border-left-color: #A78BFA; }
+  .sec-align   .section-title { color: #A78BFA; }
+  .sec-arb     { border-left-color: #4ADE80; }
+  .sec-arb     .section-title { color: #4ADE80; }
+  .sec-springs { border-left-color: #38BDF8; }
+  .sec-springs .section-title { color: #38BDF8; }
+  .sec-damping { border-left-color: #C084FC; }
+  .sec-damping .section-title { color: #C084FC; }
+  .sec-aero    { border-left-color: #2DD4BF; }
+  .sec-aero    .section-title { color: #2DD4BF; }
+  .sec-brakes  { border-left-color: #FB7185; }
+  .sec-brakes  .section-title { color: #FB7185; }
+  .sec-diff    { border-left-color: #FCD34D; }
+  .sec-diff    .section-title { color: #FCD34D; }
+  .sec-adj     { border-left-color: #FCD34D; }
+  .sec-adj     .section-title { color: #FCD34D; }
+  .sec-notes   { border-left-color: #444444; }
+  .sec-notes   .section-title { color: #888888; }
+
+  .section-title {
+    font-family: 'Barlow Condensed', sans-serif;
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+  }
+
+  .section-check { color: #2E2E2E; font-size: 11px; }
+  .section-body { padding: 2px 20px 12px; }
+
+  /* ── ROWS ── */
+  .sub-label {
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: #6E6E6E;
+    padding: 10px 0 4px;
+  }
+
+  .row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 5px 0;
+    border-bottom: 1px solid #181818;
+  }
+
+  .row:last-child { border-bottom: none; }
+  .row-label { font-size: 13px; color: #6A6A6A; font-weight: 400; }
+  .row-value { font-size: 14px; font-weight: 600; color: #D8D8D8; }
+  .dim { color: #5E5E5E; font-size: 12px; font-weight: 400; margin-left: 4px; }
+
+  .val-zero  { color: #4ADE80; }
+  .val-amber { color: #FCD34D; }
+  .val-teal  { color: #2DD4BF; }
+
+  /* ── GEARING ── */
+  .gear-box {
+    margin: 10px 0 4px;
+    border: 1px solid #1E1E1E;
+    background: #0D0D0D;
+    padding: 10px 14px 12px;
+  }
+
+  .final-drive-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    padding-bottom: 10px;
+    border-bottom: 1px solid #1E1E1E;
+    margin-bottom: 10px;
+  }
+
+  .final-drive-label {
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: #6E6E6E;
+  }
+
+  .final-drive-value {
+    font-size: 24px;
+    font-weight: 800;
+    color: #FF8A3D;
+    font-family: 'Barlow Condensed', sans-serif;
+  }
+
+  .gear-grid { display: grid; gap: 6px; }
+  .gear-grid-4  { grid-template-columns: repeat(4, 1fr); }
+  .gear-grid-5  { grid-template-columns: repeat(5, 1fr); }
+  .gear-grid-6  { grid-template-columns: repeat(6, 1fr); }
+  .gear-grid-7  { grid-template-columns: repeat(7, 1fr); }
+  .gear-grid-8  { grid-template-columns: repeat(4, 1fr); }
+  .gear-grid-9  { grid-template-columns: repeat(5, 1fr); }
+  .gear-grid-10 { grid-template-columns: repeat(5, 1fr); }
+
+  .gear-grid-7 .gear-val,
+  .gear-grid-8 .gear-val,
+  .gear-grid-9 .gear-val,
+  .gear-grid-10 .gear-val { font-size: 12px; }
+
+  .gear-item {
+    background: #161616;
+    border: 1px solid #222222;
+    padding: 5px 6px 6px;
+    text-align: center;
+  }
+
+  .gear-num { font-size: 9px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: #6E6E6E; }
+  .gear-val { font-size: 14px; font-weight: 700; color: #D0D0D0; font-family: 'Barlow Condensed', sans-serif; margin-top: 2px; }
+
+  /* ── GRID TABLE ── */
+  .grid-table { display: grid; margin: 8px 0 4px; }
+  .grid-table.cols-3 { grid-template-columns: 80px 1fr 1fr; }
+
+  .gt-cell { padding: 6px 12px; font-size: 13px; }
+
+  .gt-header {
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: #6E6E6E;
+    padding: 6px 12px;
+    text-align: center;
+    border-bottom: 1px solid #1A1A1A;
+  }
+
+  .gt-row-label {
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: #7A7A7A;
+  }
+
+  .gt-value {
+    font-size: 14px;
+    font-weight: 600;
+    color: #D8D8D8;
+    text-align: center;
+  }
+
+  /* ── AERO NOTE ── */
+  .aero-note {
+    background: #0D1412;
+    border-left: 3px solid #2DD4BF;
+    padding: 8px 12px;
+    margin-top: 8px;
+    font-size: 11px;
+    color: #7A9A96;
+    line-height: 1.5;
+  }
+
+  .aero-note strong { color: #2DD4BF; }
+
+  /* ── DIFF ── */
+  .diff-axle-row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin: 10px 0; }
+  .diff-axle-row.single { grid-template-columns: 1fr; }
+
+  .diff-axle-box {
+    border: 1px solid #1E1E1E;
+    background: #0D0D0D;
+    padding: 8px 12px 10px;
+  }
+
+  .diff-axle-label {
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: #7A7A7A;
+    padding-bottom: 6px;
+    border-bottom: 1px solid #1A1A1A;
+    margin-bottom: 4px;
+  }
+
+  .diff-center {
+    border: 1px solid #2A2200;
+    background: #181200;
+    padding: 8px 14px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 4px;
+  }
+
+  .diff-center-title {
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: #FCD34D;
+  }
+
+  .diff-center-sub { font-size: 10px; color: #8A7420; margin-top: 2px; }
+
+  .diff-center-value {
+    font-size: 22px;
+    font-weight: 800;
+    color: #FCD34D;
+    font-family: 'Barlow Condensed', sans-serif;
+  }
+
+  /* ── ADJUSTMENTS ── */
+  .adj-body { padding: 10px 20px 14px; }
+  .adj-item { font-size: 11.5px; color: #7A7A7A; line-height: 1.6; margin-bottom: 7px; }
+  .adj-item:last-child { margin-bottom: 0; }
+  .adj-item b { color: #FCD34D; font-weight: 600; }
+  .adj-item span { color: #9A9A9A; }
+
+  /* ── TUNE NOTES ── */
+  .notes-body { padding: 12px 20px 14px; }
+
+  .notes-text { font-size: 12px; color: #6E6E6E; line-height: 1.7; }
+  .notes-text p { margin-bottom: 7px; }
+  .notes-text p:last-child { margin-bottom: 0; }
+  .notes-text strong { color: #A0A0A0; font-weight: 600; }
+
+  /* ── FOOTER ── */
+  .footer {
+    padding: 9px 20px;
+    display: flex;
+    justify-content: space-between;
+    background: #0A0A0A;
+    border-top: 1px solid #181818;
+  }
+
+  .footer-text {
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: #4A4A4A;
+  }
+
+  @media print {
+    html, body { background: #fff; padding: 0; }
+    .card { border: none; max-width: 100%; }
+  }
+`;
+
+const ORD=n=>n===1?'1st':n===2?'2nd':n===3?'3rd':n+'th';
+
+/* value + unit, formatted for the sheet */
+function sv(k){
+  const v=eff(k); if(v==null) return '&mdash;';
+  const m=VMETA[k], t=fmt(k,v);
+  if(!m.u) return t;
+  return t+(/^[%°]/.test(m.u)?'':' ')+m.u;
+}
+const row=(l,v,cls)=>'<div class="row"><div class="row-label">'+l+
+  '</div><div class="row-value'+(cls?' '+cls:'')+'">'+v+'</div></div>';
+
+function sheet(){
+  const r=BASE, i=r.i, d=r.d;
+  const aeroBoth=i.aero==='both', aeroAny=eff('aeF')!=null||eff('aeR')!=null;
+
+  /* --- gearing --- */
+  const gears=r.gears.map((v,n)=>
+    '<div class="gear-item"><div class="gear-num">'+ORD(n+1)+
+    '</div><div class="gear-val">'+v.toFixed(2)+'</div></div>').join('');
+
+  /* --- differential: layout depends on drivetrain --- */
+  let diffBody;
+  if(i.dt==='AWD'){
+    diffBody='<div class="diff-axle-row">'+
+      '<div class="diff-axle-box"><div class="diff-axle-label">Front Axle</div>'+
+        row('Accel',sv('dfa'))+row('Decel',sv('dfd'),eff('dfd')===0?'val-zero':'')+'</div>'+
+      '<div class="diff-axle-box"><div class="diff-axle-label">Rear Axle</div>'+
+        row('Accel',sv('dra'))+row('Decel',sv('drd'))+'</div></div>'+
+      '<div class="diff-center"><div>'+
+        '<div class="diff-center-title">Center Balance</div>'+
+        '<div class="diff-center-sub">above 50% = rear bias</div></div>'+
+        '<div class="diff-center-value">'+fmt('dc',eff('dc'))+'%</div></div>';
+  } else {
+    const fwd=i.dt==='FWD';
+    diffBody='<div class="diff-axle-row single"><div class="diff-axle-box">'+
+      '<div class="diff-axle-label">'+(fwd?'Front':'Rear')+' Axle</div>'+
+      row('Accel',sv(fwd?'dfa':'dra'))+row('Decel',sv(fwd?'dfd':'drd'))+'</div></div>';
+  }
+
+  /* --- aero: front+rear, rear-only, or none --- */
+  let aeroBody;
+  if(aeroAny){
+    aeroBody=(eff('aeF')!=null?row('Front Downforce',sv('aeF'),'val-teal')
+                              :row('Front Downforce','Not adjustable','dim'))+
+      row('Rear Downforce',sv('aeR'),'val-teal')+
+      '<div class="aero-note">'+(aeroBoth
+        ? 'Set front to its position, then adjust rear until in-game <strong>Aero Balance reads 0.40&ndash;0.45</strong>. That reading is the real target &mdash; lbs values are secondary.'
+        : 'Front is fixed, so the in-game balance figure is <strong>not a reliable target</strong> here &mdash; trust mechanical balance from the diff, ARBs and springs instead.')+'</div>';
+  } else {
+    aeroBody=row('Downforce', i.disc==='drag'?'None &mdash; drag build':'No adjustable aero')+
+      '<div class="aero-note">'+(i.disc==='drag'
+        ? 'Downforce costs trap speed. Keep aero minimal or absent on a drag build.'
+        : 'Nothing fitted. Below A class the drag penalty usually outweighs the downforce anyway.')+'</div>';
+  }
+
+  /* --- tune notes --- */
+  const N=[];
+  N.push('<p><strong>Tire pressure:</strong> '+(i.disc==='drag'
+    ? 'Front sits near the 55 psi cap to cut rolling resistance; rear stays soft for launch traction. If the rear spins through 1st&ndash;2nd, drop another 0.5.'
+    : 'Values are cold. Warm target is 32&ndash;34 psi on the tire-temp telemetry screen &mdash; running red, raise 0.5; staying blue, lower 0.5.')+'</p>');
+  N.push('<p><strong>Mechanical balance:</strong> ARBs are split proportional to axle load, then trimmed toward rotation. Target <strong>0.55&ndash;0.65</strong> in-game (0.60 sweet spot). Below 0.55 understeers, above 0.65 goes unstable. Soften the end with the problem rather than stiffening the strong end &mdash; roughly &plusmn;0.5 ARB per 1% of balance shift.</p>');
+  N.push('<p><strong>Spring rates</strong> are absolute values from K = M(2&pi;f)&sup2; at a '+r.f.toFixed(2)+' Hz base &mdash; type them straight in and the game clamps if the car\'s range is narrower. The front/rear ratio is already set by corner mass. <strong>Ride height</strong> is a position in the slider range; if the Springs telemetry bars hit 97%+ repeatedly over bumps or curbs, raise 1&ndash;2 clicks.</p>');
+  N.push('<p><strong>Damping</strong> scales from critical damping, so heavier and stiffer-sprung corners get more. Bump is held at 0.63 &times; rebound. Diving or bouncy means bump is too soft; skipping or telemetry spikes to 100 means too stiff.</p>');
+  if(i.dt==='AWD') N.push('<p><strong>Front decel is 0% by design.</strong> High front decel locks the front axle under braking, kills trail-braking and causes entry understeer. Only raise it for a specific problem &mdash; front wheelspin under braking, extreme power, or a very rear-heavy car.</p>');
+  N.push('<p><strong>Final drive:</strong> '+fmt('fd',eff('fd'))+' is a starting estimate. Dial it in-game using the speed graph &mdash; move the slider until the power curve just reaches the edge of the graph. Confirm on track: the car should just hit the rev limiter in top gear at the end of the longest straight. <strong>Bouncing off the limiter early</strong> = lower the final drive (taller gears, more top speed). <strong>Weak exit acceleration</strong> = raise it (shorter gears, more acceleration). Individual gears stay as listed &mdash; only the final drive needs adjusting.</p>');
+
+  /* --- adjustments made after the baseline --- */
+  const adj=LOG.length ? '<div class="section">'+
+    '<div class="section-header sec-adj"><div class="section-title">Adjustments from baseline</div>'+
+    '<div class="section-check">'+LOG.length+'</div></div><div class="adj-body">'+
+    LOG.map((e,n)=>'<div class="adj-item"><b>'+(n+1)+'. '+e.l+'</b><br><span>'+
+      e.c.map(c=>VMETA[c.k].n+' '+fmt(c.k,c.from)+' &rarr; '+fmt(c.k,c.to)).join(' &nbsp;·&nbsp; ')+
+      '</span></div>').join('')+'</div></div>' : '';
+
+  const title=(i.name||'Untitled')+' — '+i.cls+' '+r.PI+' '+d.n;
+
+  return '<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8">'+
+'<meta name="viewport" content="width=device-width, initial-scale=1.0">'+
+'<title>'+title+'</title><style>'+SHEET_CSS+'</style></head><body>\n'+
+'<div class="card">\n'+
+
+'  <div class="header">\n'+
+'    <div class="watermark">'+i.cls+'</div>\n'+
+'    <div class="header-top">\n'+
+'      <div class="header-sheet-label">Forza Horizon 6 · Tune Sheet</div>\n'+
+'      <div class="car-name">'+(i.name||'Untitled')+'</div>\n'+
+'      <div class="car-sub">'+i.asp+' · '+i.gr+'-Speed · '+i.susp+' Suspension</div>\n'+
+'      <div class="badges">\n'+
+'        <div class="badge-pi">'+i.cls+' '+r.PI+'</div>\n'+
+'        <div class="badge-tag">'+i.dt+'</div>\n'+
+'        <div class="badge-tag">'+TIRE_N[i.tire]+'</div>\n'+
+'        <div class="badge-tag">'+d.n+'</div>\n'+
+'      </div>\n'+
+'    </div>\n'+
+'    <div class="stats-strip"><div class="stats-inner">\n'+
+'      <div class="stat-block"><div class="stat-label">Power</div><div class="stat-number">'+i.hp+'</div><div class="stat-unit">HP</div></div>\n'+
+'      <div class="stat-block"><div class="stat-label">Torque</div><div class="stat-number">'+i.tq+'</div><div class="stat-unit">lb-ft</div></div>\n'+
+'      <div class="stat-block"><div class="stat-label">Weight</div><div class="stat-number">'+i.wt+'</div><div class="stat-unit">lbs</div></div>\n'+
+'      <div class="stat-block"><div class="stat-label">Dist.</div><div class="stat-number">'+i.fw+'%</div><div class="stat-unit">Front</div></div>\n'+
+'    </div></div>\n'+
+'  </div>\n'+
+
+'  <div class="section"><div class="section-header sec-tires"><div class="section-title">Tires</div><div class="section-check">✓</div></div>\n'+
+'    <div class="section-body"><div class="sub-label">Tire Pressure</div>'+
+       row('Front',sv('pF'))+row('Rear',sv('pR'))+'</div></div>\n'+
+
+'  <div class="section"><div class="section-header sec-gearing"><div class="section-title">Gearing</div><div class="section-check">✓</div></div>\n'+
+'    <div class="section-body"><div class="gear-box">\n'+
+'      <div class="final-drive-row"><div class="final-drive-label">Final Drive</div>'+
+'        <div class="final-drive-value">'+fmt('fd',eff('fd'))+'</div></div>\n'+
+'      <div class="gear-grid gear-grid-'+i.gr+'">'+gears+'</div>\n'+
+'    </div></div></div>\n'+
+
+'  <div class="section"><div class="section-header sec-align"><div class="section-title">Alignment</div><div class="section-check">✓</div></div>\n'+
+'    <div class="section-body"><div class="grid-table cols-3">\n'+
+'      <div class="gt-cell gt-header"></div><div class="gt-cell gt-header">Camber</div><div class="gt-cell gt-header">Toe</div>\n'+
+'      <div class="gt-cell gt-row-label">Front</div><div class="gt-cell gt-value">'+sv('camF')+'</div><div class="gt-cell gt-value">'+sv('toeF')+'</div>\n'+
+'      <div class="gt-cell gt-row-label">Rear</div><div class="gt-cell gt-value">'+sv('camR')+'</div><div class="gt-cell gt-value">'+sv('toeR')+'</div>\n'+
+'    </div>'+row('Caster',sv('cast'))+'</div></div>\n'+
+
+'  <div class="section"><div class="section-header sec-arb"><div class="section-title">Antiroll Bars</div><div class="section-check">✓</div></div>\n'+
+'    <div class="section-body">'+row('Front',sv('arF'))+row('Rear',sv('arR'))+'</div></div>\n'+
+
+'  <div class="section"><div class="section-header sec-springs"><div class="section-title">Springs</div><div class="section-check">✓</div></div>\n'+
+'    <div class="section-body"><div class="sub-label">Spring Rate <span class="dim">— type the value in; the game clamps to range</span></div>'+
+       row('Front',sv('spF'))+row('Rear',sv('spR'))+
+'      <div class="sub-label">Ride Height</div>'+
+       row('Front',sv('rhF')+(eff('rhF')===0?' <span class="dim">minimum</span>':''))+
+       row('Rear', sv('rhR')+(eff('rhR')===0?' <span class="dim">minimum</span>':''))+
+'    </div></div>\n'+
+
+'  <div class="section"><div class="section-header sec-damping"><div class="section-title">Damping</div><div class="section-check">✓</div></div>\n'+
+'    <div class="section-body"><div class="grid-table cols-3">\n'+
+'      <div class="gt-cell gt-header"></div><div class="gt-cell gt-header">Rebound</div><div class="gt-cell gt-header">Bump</div>\n'+
+'      <div class="gt-cell gt-row-label">Front</div><div class="gt-cell gt-value">'+sv('reF')+'</div><div class="gt-cell gt-value">'+sv('buF')+'</div>\n'+
+'      <div class="gt-cell gt-row-label">Rear</div><div class="gt-cell gt-value">'+sv('reR')+'</div><div class="gt-cell gt-value">'+sv('buR')+'</div>\n'+
+'    </div></div></div>\n'+
+
+'  <div class="section"><div class="section-header sec-aero"><div class="section-title">Aero</div><div class="section-check">✓</div></div>\n'+
+'    <div class="section-body">'+aeroBody+'</div></div>\n'+
+
+'  <div class="section"><div class="section-header sec-brakes"><div class="section-title">Brakes</div><div class="section-check">✓</div></div>\n'+
+'    <div class="section-body">'+row('Balance',sv('bal'))+row('Pressure',sv('pres'))+'</div></div>\n'+
+
+'  <div class="section"><div class="section-header sec-diff"><div class="section-title">Differential — '+i.dt+'</div><div class="section-check">✓</div></div>\n'+
+'    <div class="section-body">'+diffBody+'</div></div>\n'+
+
+adj+
+
+'  <div class="section"><div class="section-header sec-notes"><div class="section-title">Tune Notes</div></div>\n'+
+'    <div class="notes-body"><div class="notes-text">'+N.join('')+'</div></div></div>\n'+
+
+'  <div class="footer"><div class="footer-text">FH6 · '+i.cls+' '+r.PI+'</div>'+
+'    <div class="footer-text">'+d.n+'</div></div>\n'+
+'</div>\n</body></html>';
+}
+const slug=s=>s.toLowerCase().replace(/[^a-z0-9]+/g,'_').replace(/^_+|_+$/g,'')||'tune';
+
+/* ===================== WIRE-UP ===================== */
+const FIELDS=['name','cls','disc','wt','fw','hp','tq','dt','gr','tire','susp','aero','asp','twf','twr'];
+try{
+  const s=JSON.parse(localStorage.getItem('fh6last')||'null');
+  if(s) FIELDS.forEach(k=>{ if(s[k]!=null&&s[k]!=='') document.getElementById(k).value=s[k]; });
+}catch(e){}
+
+// build the symptom dropdown, grouped
+(function(){
+  const sel=document.getElementById('sym'), groups={};
+  for(const k in FIX){ (groups[FIX[k].g]=groups[FIX[k].g]||[]).push(k); }
+  sel.innerHTML=Object.keys(groups).map(g=>
+    '<optgroup label="'+g+'">'+groups[g].map(k=>'<option value="'+k+'">'+FIX[k].l+'</option>').join('')+'</optgroup>'
+  ).join('');
+})();
+
+const fail=msg=>{
+  document.getElementById('out').innerHTML=
+    '<div class="panel empty" style="color:#ff8787">'+msg+'</div>';
+  document.getElementById('save').disabled=true;
+  document.getElementById('adjust').style.display='none';
+  VIEW='none';
+};
+
+/* read + validate the form; returns null and paints an error if unusable */
+function readForm(needStats){
+  const g=id=>document.getElementById(id).value;
+  const n=id=>parseFloat(g(id));
+  const i={name:g('name').trim(),cls:g('cls'),disc:g('disc'),wt:n('wt'),fw:n('fw'),
+           hp:n('hp'),tq:n('tq'),dt:g('dt'),gr:parseInt(g('gr')),tire:g('tire'),
+           susp:g('susp'),aero:g('aero'),asp:g('asp'),twf:n('twf'),twr:n('twr')};
+  const req=needStats ? [['wt','Weight'],['fw','Front %'],['hp','HP'],['tq','Torque']]
+                      : [['wt','Weight'],['hp','HP']];
+  for(const [k,lbl] of req){
+    if(!isFinite(i[k])||i[k]<=0){ fail(lbl+' is required.'); return null; }
+  }
+  if(isFinite(i.fw)&&(i.fw<20||i.fw>80)){
+    fail('Front % looks wrong &mdash; expected 20&ndash;80 (a percentage, not lbs).'); return null;
+  }
+  try{localStorage.setItem('fh6last',JSON.stringify(Object.fromEntries(FIELDS.map(k=>[k,g(k)]))))}catch(e){}
+  return i;
+}
+
+document.getElementById('calc').onclick=()=>{
+  const i=readForm(true); if(!i) return;
+  BASE=compute(i); ADJ={}; LOG=[];        // new baseline clears adjustments
+  render(); renderLog();
+  libAdd(i,BASE.PI);                      // passively grows the reference library
+  document.getElementById('save').disabled=false;
+  document.getElementById('adjust').style.display='';
+  VIEW='tune';
+};
+
+document.getElementById('plan').onclick=()=>{
+  const i=readForm(false); if(!i) return;
+  document.getElementById('adjust').style.display='none';
+  renderPlan(i);
+  VIEW='plan';
+};
+
+document.getElementById('lib').onclick=()=>{
+  document.getElementById('adjust').style.display='none';
+  renderLib();
+  VIEW='lib';
+};
+
+document.getElementById('apply').onclick=()=>{
+  if(!BASE) return;
+  const key=document.getElementById('sym').value, fx=FIX[key];
+  const deltas=(fx.d||[]).concat(fx.dyn?fx.dyn(BASE.i.dt):[]);
+  if(applyDeltas(deltas,fx.l)){ render(); renderLog(); }
+};
+
+document.getElementById('reset').onclick=()=>{
+  if(!BASE) return;
+  ADJ={}; LOG=[]; render(); renderLog();
+};
+
+// manual edits on any output value
+document.getElementById('out').addEventListener('change',e=>{
+  const inp=e.target; if(!inp.dataset||!inp.dataset.k) return;
+  const k=inp.dataset.k, val=parseFloat(inp.value);
+  if(!isFinite(val)){ render(); return; }
+  const from=eff(k), to=snap(k,val);
+  if(Math.abs(to-from)<1e-9){ render(); return; }
+  ADJ[k]=to;
+  const changes=[{k,from,to}];
+  for(const ax of ['F','R']){                 // bump follows rebound unless set by hand
+    if(k==='re'+ax && ADJ['bu'+ax]===undefined){
+      const ob=eff('bu'+ax), nb=snap('bu'+ax,to*0.63);
+      if(Math.abs(nb-ob)>1e-9){ ADJ['bu'+ax]=nb; changes.push({k:'bu'+ax,from:ob,to:nb,auto:1}); }
+    }
+  }
+  LOG.push({l:'Manual edit',c:changes});
+  render(); renderLog();
+});
+
+// library Load / Delete — addressed by build key so display order can't desync
+document.getElementById('out').addEventListener('click',e=>{
+  const b=e.target; if(!b||!b.dataset) return;
+  const load=b.dataset.load, del=b.dataset.del;
+  if(load!==undefined){
+    const r=libLoad().find(x=>x.k===decodeURIComponent(load)); if(!r) return;
+    FIELDS.forEach(k=>{
+      const el=document.getElementById(k);
+      if(el&&r[k]!=null&&r[k]!=='') el.value=r[k];
+    });
+    document.getElementById('calc').click();
+  } else if(del!==undefined){
+    const k=decodeURIComponent(del);
+    libStore(libLoad().filter(x=>x.k!==k));
+    renderLib();
+  }
+});
+
+document.getElementById('save').onclick=()=>{
+  if(!BASE) return;
+  const fn=slug(BASE.i.name)+'_'+BASE.i.cls.toLowerCase()+'_'+
+           slug(BASE.d.n.replace(/ \/ .*/,''))+'.html';
+  const b=new Blob([sheet()],{type:'text/html'});
+  const a=document.createElement('a');
+  a.href=URL.createObjectURL(b); a.download=fn; a.click();
+  URL.revokeObjectURL(a.href);
+};
+
+document.addEventListener('keydown',e=>{
+  if(e.key==='Enter'&&e.target.tagName!=='BUTTON'&&!(e.target.dataset&&e.target.dataset.k))
+    document.getElementById('calc').click();
+});
+</script>
+</body>
+</html>
