@@ -26,16 +26,6 @@
   h1{font-size:17px;margin:0 0 2px;letter-spacing:.2px}
   .sub{color:var(--dim);font-size:12px;margin-bottom:16px}
   .cols{display:grid;grid-template-columns:330px 1fr;gap:18px;align-items:start}
-  @media(max-width:900px){
-    .cols{grid-template-columns:1fr}
-    .wrap{padding:14px 12px calc(14px + env(safe-area-inset-bottom))}
-    /* iOS zooms the page when a focused field is under 16px — keep every
-       typeable control at 16px on small screens so tapping in doesn't jump. */
-    input,select,input.vi{font-size:16px}
-    input.vi{width:5.6em}
-    button{padding:13px}
-    .adjrow{grid-template-columns:1fr;gap:8px}
-  }
 
   .panel{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:14px}
   .panel h2{font-size:11px;text-transform:uppercase;letter-spacing:.9px;color:var(--dim);
@@ -152,6 +142,31 @@
       padding-bottom:9px;border-bottom:1px solid var(--line);flex-wrap:wrap;gap:6px}
   .hd .nm{font-size:16px;font-weight:600}
   .hd .mt{color:var(--dim);font-size:12px;font-family:ui-monospace,Consolas,monospace}
+
+  /* ---- MOBILE — the primary use case, phone in hand next to the game.
+     This block must stay LAST in the stylesheet: the control styles above use
+     the `font` shorthand, which resets font-size, so an earlier media query
+     gets silently overridden by them. ---- */
+  @media(max-width:900px){
+    .cols{grid-template-columns:1fr}
+    .wrap{padding:14px 12px calc(20px + env(safe-area-inset-bottom))}
+    h1{font-size:19px}
+
+    /* iOS zooms the whole page when a focused field is under 16px, which throws
+       the layout around mid-entry. 16px everywhere typeable, with thumb-sized
+       hit areas on the controls used on every build. */
+    input,select{font-size:16px;padding:11px 10px}
+    button{padding:14px;font-size:15px}
+    .btns{gap:10px}
+    .adjrow{grid-template-columns:1fr;gap:8px}
+
+    /* Result values: read at arm's length, still tappable to edit. */
+    .kv .v{font-size:16px}
+    input.vi{font-size:16px;width:5.4em;padding:6px 7px}
+    .kv .k{font-size:13px}
+    .sec .body{padding:10px 13px}
+    .note{font-size:12px}
+  }
 </style>
 </head>
 <body>
@@ -1344,6 +1359,27 @@ const SHEET_CSS=`
     letter-spacing: 0.12em;
     text-transform: uppercase;
     color: #4A4A4A;
+  }
+
+  /* Saved sheets get opened on a phone, so they have to survive a narrow
+     viewport. The gear grid is the pinch point: one column per gear pushes
+     past 320px from six gears up, so below 480px it reflows to four columns
+     and wraps instead. */
+  @media (max-width: 480px) {
+    html, body { padding: 14px 8px; }
+    .header { padding: 18px 16px 0; }
+    .section-body, .notes-body, .adj-body { padding-left: 14px; padding-right: 14px; }
+    .gear-grid-4, .gear-grid-5, .gear-grid-6, .gear-grid-7,
+    .gear-grid-8, .gear-grid-9, .gear-grid-10 { grid-template-columns: repeat(4, 1fr); }
+    .gear-grid .gear-val { font-size: 13px; }
+    .grid-table.cols-3 { grid-template-columns: 58px 1fr 1fr; }
+    .gt-cell { padding: 6px 8px; }
+    .stats-strip { padding: 12px 12px 16px; }
+    .stat-block { padding: 8px 13px 10px; }
+    .diff-axle-row { grid-template-columns: 1fr; }
+    .car-name { font-size: 26px; }
+    .watermark { font-size: 64px; }
+    .row-label { font-size: 12.5px; }
   }
 
   @media print {
