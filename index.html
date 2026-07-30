@@ -41,6 +41,17 @@
   input[type=number]::-webkit-inner-spin-button{-webkit-appearance:none;margin:0}
   .row2{display:grid;grid-template-columns:1fr 1fr;gap:9px}
   .rowNY{display:grid;grid-template-columns:2fr 1fr;gap:9px}
+  .rowNYF{display:grid;grid-template-columns:2fr 1fr auto;gap:9px;align-items:end}
+  .findbtn{background:var(--panel2);border:1px solid var(--line);color:var(--tx);
+        padding:7px 13px;border-radius:6px;font-size:13px;font-weight:600;white-space:nowrap}
+  .findbtn:hover{border-color:var(--acc)}
+  .hits{display:grid;gap:7px;margin-top:9px}
+  .hit{display:flex;justify-content:space-between;align-items:center;gap:10px;
+       background:var(--panel2);border:1px solid var(--line);border-radius:7px;padding:8px 11px}
+  .hit .n{font-size:13px;font-weight:600}
+  .hit .m{font-size:11.5px;color:var(--dim);margin-top:2px}
+  .hit button{background:var(--acc);color:#06121f;border:0;border-radius:5px;
+       padding:7px 12px;font-size:12px;font-weight:600;white-space:nowrap}
   .mini{background:var(--panel2);border:1px solid var(--line);color:var(--dim);font-size:11px;
         padding:4px 10px;border-radius:5px;font-weight:600;letter-spacing:.4px;
         text-transform:none}
@@ -228,9 +239,12 @@
       <h2 style="margin-top:16px">Car stats <span class="hint">— one screen</span></h2>
       <div class="hint" style="margin-bottom:2px">All on the Upgrades stat panel (toggle the
         detailed display) after your last part is bought &mdash; read it once, top to bottom.</div>
-      <div class="rowNY">
-        <div><label>Car name</label><input id="name" placeholder="Lancer Evolution VIII MR"></div>
+      <div class="rowNYF">
+        <div><label>Car name</label>
+          <input id="name" list="carlist" autocomplete="off" placeholder="Lancer Evolution VIII MR">
+          <datalist id="carlist"></datalist></div>
         <div><label>Year</label><input id="year" type="number" inputmode="numeric" placeholder="2004"></div>
+        <div><button id="find" type="button" class="findbtn" title="Pull the stats from a car you've saved before">Find</button></div>
       </div>
       <div class="row2">
         <div><label>Weight (lbs)</label><input id="wt" type="number" inputmode="decimal" placeholder="3241"></div>
@@ -694,6 +708,7 @@ function libAdd(i,PI){
   const ix=a.findIndex(x=>x.k===k);
   if(ix>-1) a[ix]=e; else a.push(e);
   libStore(a);
+  refreshCarList();
 }
 const carTitle=i=>(i.year?i.year+' ':'')+(i.name||'Untitled');
 const hpk=(hp,wt)=>Math.round(hp/wt*1000);   // hp per 1000 lb (compute() has its own local pw)
@@ -1748,8 +1763,66 @@ function applyAutoParts(force){
 ['cls','disc'].forEach(id=>document.getElementById(id).addEventListener('change',()=>applyAutoParts()));
 // On a fresh browser, seed the parts from the starting class/event. On a restored
 // session, adopt whatever was saved as the baseline so it isn't overwritten.
+refreshCarList();
 if(restored) lastAuto=autoParts(document.getElementById('cls').value,document.getElementById('disc').value);
 else applyAutoParts(true);
+
+/* ===================== FIND A SAVED CAR =====================
+   There is no FH6 car API, and the one real stat database is stock-only — which
+   would be actively wrong here, since the tune needs post-upgrade weight, power
+   and distribution. So "search" means search what you have already entered:
+   your own finished builds, which are by definition the right numbers. */
+function loadBuild(key){
+  const r=libLoad().find(x=>x.k===key); if(!r) return false;
+  FIELDS.forEach(k=>{
+    const el=document.getElementById(k);
+    if(el) el.value=(r[k]!=null?r[k]:'');   // clear fields the build didn't set — no stale carry-over
+  });
+  // rebase the auto-parts tracker so a later class change can't clobber the
+  // loaded build's tire/aero choices
+  lastAuto=autoParts(document.getElementById('cls').value,document.getElementById('disc').value);
+  document.getElementById('calc').click();
+  return true;
+}
+
+/* Native autocomplete on the name field, fed by the library. */
+function refreshCarList(){
+  const seen={}, opts=[];
+  libLoad().forEach(b=>{ const t=carTitle(b); if(!seen[t]){ seen[t]=1; opts.push(t); } });
+  document.getElementById('carlist').innerHTML=
+    opts.sort().map(t=>'<option value="'+t.replace(/"/g,'&quot;')+'">').join('');
+}
+
+document.getElementById('find').onclick=()=>{
+  const q=document.getElementById('name').value.trim().toLowerCase();
+  const yr=document.getElementById('year').value.trim();
+  const all=libLoad();
+  if(!all.length) return fail('Nothing saved yet &mdash; Find looks through cars you have already built. Save a sheet and they turn up here.');
+  if(!q&&!yr) return fail('Type part of a car name (or a year) first, then Find.');
+
+  let hits=all.filter(b=>{
+    const nameOk=!q||String(b.name||'').toLowerCase().includes(q);
+    const yearOk=!yr||String(b.year||'')===yr;
+    return nameOk&&yearOk;
+  });
+  if(!hits.length) return fail('No saved build matches that. Find only searches cars you have entered before &mdash; there is no FH6 car database to look them up in.');
+
+  if(hits.length===1){ loadBuild(hits[0].k); return; }
+
+  // several builds of the same car — let the class/discipline decide
+  hits=hits.sort((a,b)=>(b.ts||0)-(a.ts||0));
+  document.getElementById('adjust').style.display='none';
+  document.getElementById('out').innerHTML=
+    '<div class="panel"><div class="hd"><div class="nm">'+hits.length+' saved builds match</div></div>'+
+    '<div style="color:var(--dim);font-size:12px">Pick which one to pull the stats from.</div>'+
+    '<div class="hits">'+hits.map(b=>
+      '<div class="hit"><div><div class="n">'+carTitle(b)+'</div><div class="m">'+
+        b.cls+' '+b.PI+' &middot; '+DISC[b.disc].n+' &middot; '+b.dt+' &middot; '+
+        b.hp+' hp / '+b.wt+' lb</div></div>'+
+      '<button data-load="'+encodeURIComponent(b.k)+'">Use</button></div>').join('')+
+    '</div></div>';
+  VIEW='find'; showResults();
+};
 
 const fail=msg=>{
   document.getElementById('out').innerHTML=
@@ -1864,15 +1937,7 @@ document.getElementById('out').addEventListener('click',e=>{
   const b=e.target; if(!b||!b.dataset) return;
   const load=b.dataset.load, del=b.dataset.del;
   if(load!==undefined){
-    const r=libLoad().find(x=>x.k===decodeURIComponent(load)); if(!r) return;
-    FIELDS.forEach(k=>{
-      const el=document.getElementById(k);
-      if(el) el.value=(r[k]!=null?r[k]:'');   // clear fields the build didn't set — no stale carry-over
-    });
-    // rebase the auto-parts tracker so a later class change can't clobber the
-    // loaded build's tire/aero choices
-    lastAuto=autoParts(document.getElementById('cls').value,document.getElementById('disc').value);
-    document.getElementById('calc').click();
+    loadBuild(decodeURIComponent(load));
   } else if(del!==undefined){
     // two-tap delete — one stray thumb on a phone shouldn't erase a build
     if(!b.dataset.arm){
@@ -1881,7 +1946,7 @@ document.getElementById('out').addEventListener('click',e=>{
       return;
     }
     libStore(libLoad().filter(x=>x.k!==decodeURIComponent(del)));
-    renderLib();
+    refreshCarList(); renderLib();
   }
 });
 
