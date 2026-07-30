@@ -156,6 +156,8 @@
   .note{margin-top:9px;padding-top:9px;border-top:1px dashed var(--line);
         color:var(--dim);font-size:11.5px;line-height:1.5}
   .note b{color:#c8d2e4;font-weight:600}
+  .note a{color:var(--acc);text-decoration:none;word-break:break-all}
+  .note a:hover{text-decoration:underline}
   .gears{display:grid;gap:4px;margin-top:8px}
   .gears .g{display:flex;justify-content:space-between;font:12.5px ui-monospace,Consolas,monospace;
         background:var(--panel2);padding:3px 8px;border-radius:4px}
@@ -238,8 +240,14 @@
         <div><label>HP</label><input id="hp" type="number" inputmode="decimal" placeholder="612"></div>
         <div><label>Torque (lb-ft)</label><input id="tq" type="number" inputmode="decimal" placeholder="480"></div>
       </div>
-      <label>Drivetrain</label>
-      <select id="dt"><option>RWD</option><option>AWD</option><option>FWD</option></select>
+      <div class="row2">
+        <div><label>Drivetrain</label>
+          <select id="dt"><option>RWD</option><option>AWD</option><option>FWD</option></select></div>
+        <div><label>Current PI <span class="hint">opt.</span></label>
+          <input id="pi" type="number" inputmode="decimal" placeholder="648"></div>
+      </div>
+      <div class="hint" style="margin-top:6px">PI is the big number on the same panel. Enter it and
+        the Build Plan works out how much budget you have left to the class ceiling.</div>
 
       <h2 style="margin-top:16px">What's fitted <span class="hint">— you chose these; defaults follow class &amp; event</span></h2>
       <div class="row2">
@@ -313,6 +321,10 @@
 
 <script>
 const PI_CEIL={D:400,C:500,B:600,A:700,S1:800,S2:900,R:998,X:999};
+/* Which class a raw PI number falls in — lets an entered PI replace the
+   power-to-weight guesswork with the real figure. */
+const PI_BANDS=[['D',400],['C',500],['B',600],['A',700],['S1',800],['S2',900],['R',998]];
+const classForPI=pi=>{ const b=PI_BANDS.find(x=>pi<=x[1]); return b?b[0]:'X'; };
 
 /* aF/aR are multipliers on the axle-load-proportional ARB base (1.0 = neutral
    for that axle's share of the weight). <1 front + >1 rear = rotation trim. */
@@ -619,6 +631,10 @@ function buildPlan(i){
     f.push('<b>Heavy for drift.</b> At '+W+' lb transitions will be slow to initiate and punishing to catch. Prioritise weight reduction hard.');
   if(i.dt==='RWD'&&i.disc==='drag')
     f.push('<b>RWD on a drag build gives up the launch.</b> If an AWD swap is available it usually pays for its PI here — this is the discipline where that trade makes the most sense.');
+  if(isFinite(i.pi)&&i.pi>PI_CEIL[i.cls])
+    f.push('<b>Already past the '+i.cls+' ceiling.</b> At '+Math.round(i.pi)+' PI you are '+
+      (Math.round(i.pi)-PI_CEIL[i.cls])+' points over '+PI_CEIL[i.cls]+
+      '. Take parts off, or build this as '+classForPI(Math.round(i.pi))+' — the plan below assumes you are building up to a ceiling, not down to one.');
   if(W<=1900&&['S2','R','X'].includes(i.cls))
     f.push('<b>Very light car at '+i.cls+'.</b> Getting to this class means a lot of power in very little mass — expect it to be traction-limited and nervous. Grip and downforce will matter more than the next power upgrade.');
 
@@ -984,13 +1000,27 @@ function carNotes(i){
     ? fit.join(', ')+'. That is read off the numbers, not the badge — a good tune moves a car a long way outside its comfort zone.'
     : 'Nothing jumps out from the numbers. It should be workable anywhere with the right build.']);
 
-  const band=PW_BAND.find(b=>pw<b[0])[1];
-  const chosen=i.cls;
-  let cls='At '+pw+' hp per 1000 lb this sits around <b>'+band+'</b> on power-to-weight alone';
-  cls += band.indexOf(chosen)>-1
-    ? ', which lines up with the '+chosen+' you have selected.'
-    : ', while you have targeted <b>'+chosen+'</b>. That is not necessarily wrong — grip, aero and weight all move PI too — but if the gap is large, expect to spend PI differently than the plan assumes.';
-  cls += ' <span style="opacity:.75">Rough orientation only: Forza sets PI from a simulated lap, not a formula, so nothing can predict it. The Buy &amp; Install screen is the real answer.</span>';
+  const chosen=i.cls, ceil=PI_CEIL[chosen];
+  let cls;
+  if(isFinite(i.pi)&&i.pi>0){
+    // real number beats any estimate — say exactly what the budget is
+    const cur=Math.round(i.pi), curCls=classForPI(cur), head=ceil-cur;
+    cls='Sitting at <b>'+cur+' PI</b> ('+curCls+' as it stands). '+chosen+' tops out at '+ceil+', so ';
+    cls += head>0 ? 'you have <b>'+head+' points</b> to spend.'
+         : head===0 ? 'you are <b>exactly on the ceiling</b> — nothing left to add.'
+         : 'you are <b>'+(-head)+' points over</b>. Strip something, or build it for '+curCls+' instead.';
+    if(head>0) cls += head<=15
+      ? ' That is barely anything — a compound step or a last power part, not a rebuild.'
+      : head<=60 ? ' Enough for tyres plus a couple of chassis parts, or a decent power bump.'
+      : ' Plenty of room: work the whole chassis list before you spend any of it on power.';
+  } else {
+    const band=PW_BAND.find(b=>pw<b[0])[1];
+    cls='At '+pw+' hp per 1000 lb this sits around <b>'+band+'</b> on power-to-weight alone';
+    cls += band.indexOf(chosen)>-1
+      ? ', which lines up with the '+chosen+' you have selected.'
+      : ', while you have targeted <b>'+chosen+'</b>. Not necessarily wrong — grip, aero and weight all move PI too — but if the gap is large, expect to spend PI differently than the plan assumes.';
+    cls += ' <span style="opacity:.75">Rough orientation only: Forza sets PI from a simulated lap, not a formula, so nothing can predict it. Enter Current PI and this becomes exact.</span>';
+  }
   out.push(['Class fit',cls]);
 
   return out;
@@ -1013,6 +1043,11 @@ function renderPlan(i){
 
   let ctx='<div class="ctx"><b>Current entry:</b> '+i.hp+' hp / '+i.wt+' lb &nbsp;&rarr;&nbsp; <span class="pw">'+
     hpk(i.hp,i.wt)+'</span> hp per 1000 lb';
+  if(isFinite(i.pi)&&i.pi>0){
+    const cur=Math.round(i.pi), head=PI_CEIL[i.cls]-cur;
+    ctx+='<br><b>PI budget:</b> '+cur+' now, '+PI_CEIL[i.cls]+' ceiling &nbsp;&rarr;&nbsp; <span class="pw">'+
+      (head>0?head+' to spend':head===0?'at the ceiling':(-head)+' over')+'</span>';
+  }
   if(p.peers.length){
     ctx+='<br><br><b>Your finished '+i.cls+' '+DISC[i.disc].n+' builds</b> for reference '+
       '<span style="opacity:.7">(your own data, not a rule)</span>:<br>'+
@@ -1042,7 +1077,19 @@ function renderPlan(i){
     'No predicted PI, weight or horsepower numbers appear anywhere above, and that is deliberate. Forza derives PI from a simulated lap rather than a formula, so no tool can honestly tell you what PI a set of parts will land on &mdash; and no public dataset exposes per-part weight or power deltas. The Buy &amp; Install screen shows all of it live as you hover. Use this for sequence and priority; use the game for numbers.'+
     '</div></div></div>';
 
-  document.getElementById('out').innerHTML=hd+flags+notes+ctx+steps+decisions+caveat;
+  /* Worth keeping reachable from the phone rather than buried in a commit
+     message — these are the only FH6-specific sources that aren't AI farms. */
+  const reading='<div class="sec" style="--c:#6a7180"><h3>Worth reading / watching</h3>'+
+    '<div class="body"><div class="note" style="margin:0;padding:0;border:0">'+
+    '<b>HokiHoshi &mdash; "How To Build &amp; Tune in Forza Horizon 6: Basic Refresher &amp; FH6 Changes"</b> (16 May 2026)<br>'+
+    '<a href="https://www.youtube.com/watch?v=I9bUB3mcqso" target="_blank" rel="noopener">youtube.com/watch?v=I9bUB3mcqso</a><br>'+
+    'The methodology most of this app\'s ARB and damper baselines trace back to, with his FH6-specific changes. If anything he states contradicts a value here, his wins &mdash; note it and it is a one-line fix.<br><br>'+
+    '<b>ForzaTune tuning guide</b> &mdash; <a href="https://forzatune.com/guide/the-fully-updated-forza-tuning-guide/" target="_blank" rel="noopener">forzatune.com/guide</a><br>'+
+    'The only documented FH6-vs-FH5 source found: tire pressure, diff bands and the aero-balance target here come from it.<br><br>'+
+    '<span style="opacity:.75">Everything else ranking for "FH6 tuning" is AI-generated content farms copying each other, and forums.forza.net shut down in July 2026. Treat unfamiliar sites as fabricated until proven otherwise.</span>'+
+    '</div></div></div>';
+
+  document.getElementById('out').innerHTML=hd+flags+notes+ctx+steps+decisions+caveat+reading;
 }
 
 function drivetrainNote(i){
@@ -1656,7 +1703,7 @@ adj+
 const slug=s=>s.toLowerCase().replace(/[^a-z0-9]+/g,'_').replace(/^_+|_+$/g,'')||'tune';
 
 /* ===================== WIRE-UP ===================== */
-const FIELDS=['name','year','cls','disc','wt','fw','hp','tq','dt','gr','tire','aero','twf','twr',
+const FIELDS=['name','year','cls','disc','wt','fw','hp','tq','dt','pi','gr','tire','aero','twf','twr',
               'tsize','rpm','vmax'];
 let restored=false;
 try{
@@ -1717,7 +1764,7 @@ function readForm(needStats){
   const g=id=>document.getElementById(id).value;
   const n=id=>parseFloat(g(id));
   const i={name:g('name').trim(),year:g('year').trim(),cls:g('cls'),disc:g('disc'),wt:n('wt'),fw:n('fw'),
-           hp:n('hp'),tq:n('tq'),dt:g('dt'),gr:parseInt(g('gr')),tire:g('tire'),
+           hp:n('hp'),tq:n('tq'),dt:g('dt'),pi:n('pi'),gr:parseInt(g('gr')),tire:g('tire'),
            aero:g('aero'),twf:n('twf'),twr:n('twr'),
            tsize:g('tsize').trim(),rpm:n('rpm'),vmax:n('vmax')};
   const req=needStats ? [['wt','Weight'],['fw','Front %'],['hp','HP'],['tq','Torque']]
@@ -1770,7 +1817,7 @@ document.getElementById('lib').onclick=()=>{
    the next car's brake balance and "exact" final drive. Class, event and the
    visible dropdowns stay: they're the context you're building in. */
 document.getElementById('newcar').onclick=()=>{
-  ['name','year','wt','fw','hp','tq','twf','twr','tsize','rpm','vmax']
+  ['name','year','wt','fw','hp','tq','pi','twf','twr','tsize','rpm','vmax']
     .forEach(id=>{ document.getElementById(id).value=''; });
   applyAutoParts(true);
   document.getElementById('save').disabled=true;
