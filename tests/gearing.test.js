@@ -126,6 +126,24 @@ ok('drag reaches furthest past the axis',
    at({ disc: 'drag', tire: 'dragt', fdfit: 4.575, vgraph: 159 }).gearTop[6] > r.gearTop[6]);
 
 console.log('--- gears that never engage are called out as wasted PI ---');
+/* Observed at final drive 4.02: 6th redlines at 154 against a 157 chart, so
+   7th's line starts inside the chart and shows as a ~3 mph stub rather than
+   disappearing. Whether the top gear is visible depends on where the gear
+   BELOW it runs out — an earlier wording implied it vanishes outright and sent
+   Boston looking for the wrong thing. */
+r = at({ fdfit: 4.575, vgraph: 157 });
+ok('predicts the stub instead of claiming it vanishes',
+   /short stub of it in the top-right corner/.test(r.w.join(' ')));
+ok('names where that stub starts', /line starts at 154 mph where 6th runs out/.test(r.w.join(' ')),
+   (r.w.join(' ').match(/line starts at \d+ mph where \w+ runs out/) || [])[0]);
+ok('sizes the stub', /about 3 mph of it fits before the edge/.test(r.w.join(' ')));
+ok('says a stub is not a usable gear', /the shift point showing, not a gear you get to use/.test(r.w.join(' ')));
+ok('card explains stub vs vanished', /a stub is not the gear fitting/.test(
+   (() => { const s = (id, v) => { document.getElementById(id).value = v; };
+     Object.keys(GR86).forEach(k => s(k, typeof GR86[k] === 'number' && isNaN(GR86[k]) ? '' : GR86[k]));
+     s('fdfit', '4.575'); s('vgraph', '157'); els['calc'].onclick();
+     const h = els['out'].innerHTML; s('vgraph', ''); return h; })()));
+r = at({ fdfit: 4.575, vgraph: 159 });
 ok('7-speed with the top ratio off the chart is flagged',
    /Top gear looks like wasted PI/.test(r.w.join(' ')));
 ok('names the shorter box that would do', /a 6-speed does the same job for less PI/.test(r.w.join(' ')));
@@ -156,7 +174,7 @@ ok('no axis maximum means no ceiling to check',
 console.log('--- the graph is described as it actually behaves ---');
 const set = (id, v) => { document.getElementById(id).value = v; };
 Object.keys(GR86).forEach(k => set(k, typeof GR86[k] === 'number' && isNaN(GR86[k]) ? '' : GR86[k]));
-set('fdfit', '4.72');
+set('fdfit', '4.72'); set('vgraph', '');
 els['calc'].onclick();
 const page = els['out'].innerHTML;
 ok('gear list shows speeds when the axis maximum is known', !/to \d+ mph/.test(page));
@@ -181,7 +199,7 @@ set('vgraph', ''); set('fdfit', '4.72'); els['calc'].onclick();
 ok('does not put a power curve on the graph',
    !/power curve (just )?reach|line up the power curve|power curve[^.]{0,40}edge of the/i.test(page));
 ok('says the axis does NOT rescale', /bottom axis does not rescale/.test(page));
-ok('explains that tall gears run off the end', /runs off the right-hand end and is not drawn/.test(page));
+ok('explains that tall gears run off the end', /runs off the right-hand end/.test(page));
 ok('says the edge is the reference, not the answer',
    /is the <em>reference point<\/em>, not the answer/.test(page));
 ok('drops the touch-the-limiter advice a long-geared car cannot follow',
