@@ -195,6 +195,41 @@ Three things came out of it:
    6-speed would have performed identically for less PI, which is a build
    finding no amount of tuning fixes.
 
+**Whether a gear is dead has nothing to do with whether it fits the chart.**
+You shift *into* gear N at the speed where gear N−1 runs out, so the test is
+that shift-in speed against top speed. The two conditions are independent: a
+gear can hang off the right-hand edge and be perfectly useful, or sit inside
+the chart and never be touched. And whether the top gear is even *visible*
+depends on where the gear below it ends — at final drive 4.02 the GR86's 7th
+showed as a ~3 mph stub because 6th ran out at 154 on a 157 chart, which is the
+shift point drawn rather than the gear fitting. Without a measured top speed
+there is nothing honest to compare against, since the axis sits ~13 mph above
+anything the car reaches; `compute()` says so and asks for the number rather
+than guessing.
+
+### Searching for outside confirmation: don't bother
+
+Asked to check this against published sources 2026-07-31, the result was
+nothing usable, and it is worth recording so nobody spends the tokens again:
+
+- The one forza.net thread on exactly this subject ("Gear/speed graph not
+  correct in tuning menu") **301s to a forums landing page** — the shutdown
+  took the content with it.
+- `forza.guide` and `traxion.gg` both return **403** to fetches.
+- **ForzaTune's gearing guides do not discuss the graph at all.** Their only
+  relevant lines are "pick a top gear and final drive combination that reach
+  your top speed" and that changing forward gears is not recommended. No axis,
+  no overrun, no unused gears.
+- The AI-written search summaries assert that gearing **too short** makes the
+  top gear overrun the chart. That is backwards — short gearing pulls every
+  line left — and our own sweep contradicts it directly. One summary also
+  repeated the "move the final drive until the curve reaches the edge of the
+  graph" line, which is very likely where this repo's original wrong text came
+  from in the first place.
+
+Everything real about the gearing graph in this file was measured off Boston's
+screen. Treat that as the only source.
+
 The verified core, which survived all three corrections: per-gear limiter speeds
 from `k/(FD·G)` with `k = axisMax · fdFit · G_top`. Checked against the graph at
 final drive 4.82 — 42/59/76/94/111/129/148 measured, 42/60/77/95/113/130/151

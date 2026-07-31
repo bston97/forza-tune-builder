@@ -131,27 +131,49 @@ console.log('--- gears that never engage are called out as wasted PI ---');
    disappearing. Whether the top gear is visible depends on where the gear
    BELOW it runs out — an earlier wording implied it vanishes outright and sent
    Boston looking for the wrong thing. */
-r = at({ fdfit: 4.575, vgraph: 157 });
+r = at({ fdfit: 4.575, vgraph: 157, vmax: 143.5 });
 ok('predicts the stub instead of claiming it vanishes',
    /short stub of it in the top-right corner/.test(r.w.join(' ')));
-ok('names where that stub starts', /line starts at 154 mph where 6th runs out/.test(r.w.join(' ')),
-   (r.w.join(' ').match(/line starts at \d+ mph where \w+ runs out/) || [])[0]);
-ok('sizes the stub', /about 3 mph of it fits before the edge/.test(r.w.join(' ')));
-ok('says a stub is not a usable gear', /the shift point showing, not a gear you get to use/.test(r.w.join(' ')));
+ok('sizes the stub', /about 3 mph of line before the edge/.test(r.w.join(' ')),
+   (r.w.join(' ').match(/about \d+ mph of line/) || [])[0]);
+ok('says a stub is not a usable gear', /the shift point drawn, not a gear you use/.test(r.w.join(' ')));
 ok('card explains stub vs vanished', /a stub is not the gear fitting/.test(
    (() => { const s = (id, v) => { document.getElementById(id).value = v; };
      Object.keys(GR86).forEach(k => s(k, typeof GR86[k] === 'number' && isNaN(GR86[k]) ? '' : GR86[k]));
      s('fdfit', '4.575'); s('vgraph', '157'); els['calc'].onclick();
      const h = els['out'].innerHTML; s('vgraph', ''); return h; })()));
-r = at({ fdfit: 4.575, vgraph: 159 });
-ok('7-speed with the top ratio off the chart is flagged',
-   /Top gear looks like wasted PI/.test(r.w.join(' ')));
-ok('names the shorter box that would do', /a 6-speed does the same job for less PI/.test(r.w.join(' ')));
-ok('cites the reference car', /7th ratio was dead at every setting/.test(r.w.join(' ')));
+/* A gear earns its place by being REACHED, not by fitting the chart. You shift
+   into gear N where gear N-1 runs out, so the test is that speed against top
+   speed — independent of whether the line fits on the axis. The two conditions
+   are orthogonal: a gear can hang off the edge and still be used, or sit well
+   inside the chart and never be touched. */
+r = at({ fdfit: 4.575, vgraph: 157, vmax: 143.5 });
+ok('flags the gear that is never entered', /Top gear never engages/.test(r.w.join(' ')));
+ok('names the shift-in speed, not the redline', /shift into 7th at 154 mph/.test(r.w.join(' ')),
+   (r.w.join(' ').match(/shift into \w+ at \d+ mph/) || [])[0]);
+ok('says running off the chart is not itself the problem',
+   /Running off the chart is not the problem/.test(r.w.join(' ')));
+ok('names the shorter box that would do', /A 6-speed does the same job for less PI/.test(r.w.join(' ')));
+ok('quotes the measured figure', /only reaches 144 mph/.test(r.w.join(' ')));
+ok('a measured top speed above the shift point clears the gear',
+   !/never engages/.test(at({ fdfit: 4.575, vgraph: 157, vmax: 156 }).w.join(' ')));
+
+/* Without a measured top speed the axis is the only comparison available, and
+   it sits well above anything the car reaches — 13 mph above on the GR86. So a
+   shift point just under the axis proves nothing, and the app says so rather
+   than guessing in either direction. */
+const noTop = at({ fdfit: 4.575, vgraph: 157 }).w.join(' ');
+ok('admits it cannot tell without top speed', /Cannot tell whether your top gear does anything/.test(noTop));
+ok('explains why the axis will not do', /the end of the graph is not a speed the car reaches/.test(noTop));
+ok('asks for the one number that settles it', /Fill in <b>Top speed at the fit<\/b>/.test(noTop));
+ok('does not condemn the gear on a guess', !/never engages/.test(noTop));
 ok('counts more than one when more than one is dead',
-   /Top 2 gears look like wasted PI/.test(at({ disc: 'drag', tire: 'dragt', fdfit: 6.2, vgraph: 159 }).w.join(' ')));
+   /Top 3 gears never engage/.test(
+     at({ disc: 'drag', tire: 'dragt', fdfit: 6.2, vgraph: 159, vmax: 120 }).w.join(' ')),
+   (at({ disc: 'drag', tire: 'dragt', fdfit: 6.2, vgraph: 159, vmax: 120 }).w.join(' ')
+      .match(/Top \d+ gears never engage/) || [])[0]);
 ok('no axis maximum means no claim about dead gears',
-   !/wasted PI/.test(at({ fdfit: 4.575 }).w.join(' ')));
+   !/never engage/.test(at({ fdfit: 4.575 }).w.join(' ')));
 ok('no axis maximum means no speeds, not wrong speeds', at({ fdfit: 4.575 }).gearTop === null);
 ok('no fit means no speeds', at({ vgraph: 159 }).gearTop === null);
 
