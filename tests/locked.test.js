@@ -17,7 +17,7 @@ const set = (id, v) => { document.getElementById(id).value = v; };
 const CAR = { name: 'Evo', year: '2004', cls: 'A', disc: 'road', wt: '3241', fw: '57',
   hp: '612', tq: '480', dt: 'RWD', pi: '', gr: '6', tire: 'sport', aero: 'both',
   twf: '0', twr: '0', susp: 'race', arb: 'both', trans: 'sport', diff: 'race',
-  tsize: '', rpm: '', vmax: '' };
+  vmax: '' };
 function build(o) {
   Object.keys(Object.assign({}, CAR, o)).forEach(k => set(k, Object.assign({}, CAR, o)[k]));
   els['calc'].onclick();

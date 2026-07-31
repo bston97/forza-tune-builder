@@ -9,7 +9,7 @@ const X=globalThis.__X;
 const ok=(l,c,e)=>console.log((c?'PASS  ':'FAIL  ')+l+(e!==undefined?'   '+e:''));
 const set=(id,v)=>{document.getElementById(id).value=v};
 const fill=o=>Object.keys(o).forEach(k=>set(k,o[k]));
-const BLANK={name:'',year:'',wt:'',fw:'',hp:'',tq:'',pi:'',twf:'',twr:'',tsize:'',rpm:'',vmax:''};
+const BLANK={name:'',year:'',wt:'',fw:'',hp:'',tq:'',pi:'',twf:'0',twr:'0',vmax:''};
 
 console.log('--- Build Plan captures the starting stats ---');
 fill(Object.assign({},BLANK,{name:'Lancer Evolution VIII MR',year:'2004',cls:'A',disc:'sprint',

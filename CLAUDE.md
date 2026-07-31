@@ -216,6 +216,28 @@ there is nothing honest to compare against, since the axis sits ~13 mph above
 anything the car reaches; `compute()` says so and asks for the number rather
 than guessing.
 
+### Inputs that were removed, and one that looks redundant but isn't
+
+**Tire size and redline are gone** (2026-07-31). They fed only the old absolute
+final-drive solve — rolling circumference × redline ÷ top gear — which was
+strictly dominated: three numbers off in-game screens to produce a worse answer
+than the fit's one, when you have to be in the tuning menu to apply a final
+drive either way, and it trusted a tire size that is easy to get wrong after a
+width upgrade. `tireCirc()` went with them. Two paths remain: the fit, or an
+admitted guess.
+
+**Tire width is read only as a difference.** `wStep = twr − twf` shifts brake
+bias toward the wider axle; nothing else uses either value. So 0/0 and +3/+3
+produce an identical tune, which was not obvious from the form and now says so.
+
+**The fit at `vFrac` 1.00 hands back the number you typed, and that is fine.**
+Boston asked, fairly, why he should type a final drive in just to be told to set
+it. For road the division genuinely does nothing. What the input earns is
+everything downstream: with Graph max it gives the car's speed constant, which
+is what puts real mph on each gear and identifies ratios that never engage. The
+card says that outright at 1.00 rather than dressing "÷ 1.00" up as a
+calculation — if it ever reads like arithmetic theatre again, that is the bug.
+
 ### Why there is no simulator, and what `sweep.test.js` does instead
 
 Asked 2026-07-31 whether the sweep data could be reverse-engineered into a

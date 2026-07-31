@@ -40,7 +40,7 @@ const SWEEP = [
 const FIT = 4.575, AXIS = 157;
 const CAR = { name: 'GR86', cls: 'A', disc: 'road', wt: 2900, fw: 53, hp: 350, tq: 260,
   dt: 'RWD', gr: 7, tire: 'sport', aero: 'both', twf: 0, twr: 0, susp: 'race', arb: 'both',
-  trans: 'race', diff: 'race', tsize: '', rpm: NaN, vmax: NaN, fdfit: FIT, vgraph: AXIS };
+  trans: 'race', diff: 'race', vmax: NaN, fdfit: FIT, vgraph: AXIS };
 
 /* Rank each measured setting 1..6 on all three figures and sum. Equal weight is
    crude, but it is honest about the fact that no single metric decides a lap. */

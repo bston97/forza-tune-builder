@@ -25,14 +25,14 @@ const js = readScript();
 let blob = null;
 const URL = { createObjectURL: b => { blob = b; return 'x'; }, revokeObjectURL() {} };
 const Blob = class { constructor(a) { this.parts = a; } };
-eval(js + ';globalThis.__X={compute,SPREAD,DISC,tireCirc};');
+eval(js + ';globalThis.__X={compute,SPREAD,DISC};');
 const X = globalThis.__X;
 const ok = (l, c, e) => console.log((c ? 'PASS  ' : 'FAIL  ') + l + (e !== undefined ? '   ' + e : ''));
 const near = (a, b, tol) => Math.abs(a - b) <= tol;
 
 const GR86 = { name: 'GR86', cls: 'A', disc: 'road', wt: 2900, fw: 53, hp: 350, tq: 260,
   dt: 'RWD', gr: 7, tire: 'sport', aero: 'both', twf: 0, twr: 0, susp: 'race', arb: 'both',
-  trans: 'race', diff: 'race', tsize: '', rpm: NaN, vmax: NaN, fdfit: NaN };
+  trans: 'race', diff: 'race', vmax: NaN, fdfit: NaN };
 const at = o => X.compute(Object.assign({}, GR86, o));
 
 console.log('--- the gear table is the game\'s own 7-speed race box ---');
@@ -58,7 +58,7 @@ ok('uses the fit path', r.fdSrc === 'fit', r.fdSrc);
 ok('road gears at the fit', near(r.v.fd, 4.575, 0.01), r.v.fd);
 ok('and the fit is inside the measured flat zone', r.v.fd >= 3.50 && r.v.fd <= 4.82, r.v.fd);
 ok('needs no tire size or top speed',
-   at({ fdfit: 4.575, tsize: '325/30R21', rpm: 9000, vmax: 200 }).v.fd === r.v.fd);
+   at({ fdfit: 4.575, vmax: 200 }).v.fd === r.v.fd);
 
 console.log('--- discipline targets ride on the same fit ---');
 const fdFor = disc => at({ fdfit: 4.575, disc,
@@ -98,11 +98,17 @@ ok('a solved build does not carry the warning',
 ok('a stock gearbox does not nag about it',
    !/is a guess, not a tune/.test(at({ trans: 'stock' }).w.join(' ')));
 
-console.log('--- fallbacks, in order ---');
-ok('tire size solves when no fit is given',
-   at({ tsize: '215/40R18', rpm: 8000, vmax: 145.4 }).fdSrc === 'tire');
-ok('the fit beats the tire solve',
-   at({ fdfit: 4.72, tsize: '215/40R18', rpm: 8000, vmax: 145.4 }).fdSrc === 'fit');
+console.log('--- two paths only: the fit, or an admitted guess ---');
+/* The tire-size + redline solve was removed 2026-07-31. It wanted three numbers
+   off in-game screens to produce a worse answer than the fit's one, and you
+   have to be in the tuning menu to apply a final drive either way. */
+ok('only two sources exist', ['fit', 'rough'].includes(at({}).fdSrc) &&
+   ['fit', 'rough'].includes(at({ fdfit: 4.575 }).fdSrc));
+ok('the removed inputs no longer affect anything',
+   at({ tsize: '215/40R18', rpm: 8000, vmax: 145.4 }).fdSrc === 'rough');
+ok('and the form no longer asks for it',
+   !/id="tsize"|id="rpm"/.test(require('fs').readFileSync(
+     require('path').join(__dirname, '..', 'index.html'), 'utf8')));
 ok('the rough path still lands in range',
    ['D', 'C', 'B', 'A', 'S1', 'S2', 'R', 'X'].every(cls =>
      [4, 6, 8, 10].every(gr => { const v = at({ cls, gr }).v.fd; return v >= 2 && v <= 7; })));
@@ -181,7 +187,15 @@ const words = h => { const g = h.indexOf('>Gearing</h3>'), n = h.indexOf('<div c
 
 const full = draw({ fdfit: '4.58', vgraph: '157', vmax: '141.5' });
 ok('opens with the number to set', /<b>Set 4\.58<\/b>/.test(full));
-ok('shows the working', /4\.58 &divide; 1\.00/.test(full));
+/* Road is 1.00, so there is no division to show — dressing "x ÷ 1.00" up as a
+   calculation invites Boston's fair question of why he is typing a number in
+   just to have it handed back. Say plainly that the fit is the setting, and
+   what the input actually buys (the gear list). */
+ok('does not fake a calculation at vFrac 1.00', !/&divide; 1\.00/.test(full));
+ok('says the fit is the setting', /your fit unchanged/.test(full));
+ok('says what the fit is really for', /What the fit buys you is the gear list/.test(full));
+ok('a discipline that does scale still shows the working',
+   /4\.58 &divide; 0\.76/.test(draw({ disc: 'touge', fdfit: '4.58', vgraph: '157', vmax: '' })));
 ok('offers the sweep band', /sweep <b>3\.\d\d&ndash;4\.\d\d<\/b>/.test(full),
    (full.match(/sweep <b>[\d.]+&ndash;[\d.]+<\/b>/) || [])[0]);
 ok('hands the decision to the Performance panel', /let the Performance panel decide/.test(full));

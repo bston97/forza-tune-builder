@@ -10,7 +10,7 @@ const ok=(l,c,e)=>console.log((c?'PASS  ':'FAIL  ')+l+(e!==undefined?'   '+e:'')
 const set=(id,v)=>{document.getElementById(id).value=v};
 const fill=o=>Object.keys(o).forEach(k=>set(k,o[k]));
 const EVO={name:'Lancer Evolution VIII MR',year:'2004',cls:'A',disc:'sprint',wt:'3241',fw:'57',
-  hp:'612',tq:'480',dt:'AWD',pi:'648',gr:'6',tire:'semi',aero:'both',twf:'',twr:'',tsize:'',rpm:'',vmax:''};
+  hp:'612',tq:'480',dt:'AWD',pi:'648',gr:'6',tire:'semi',aero:'both',twf:'0',twr:'0',vmax:''};
 
 console.log('--- empty library ---');
 set('name','evo'); els['find'].onclick();
