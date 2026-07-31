@@ -1,13 +1,20 @@
-# FH6 Tune Builder
+# Tune Goon
 
 A Forza Horizon 6 tuning calculator: enter a car's stat block, get a full tune,
 fix what the car actually did on track, plan the upgrade path, and export a
 sheet. Single self-contained `index.html` — no server, no build step, no
 dependencies. Deployed via GitHub Pages, auto-publishing from `main` on every
 push (usually live within a couple of minutes; verify with
-`gh api repos/bston97/forza-tune-builder/pages/builds/latest --jq .status`).
+`gh api repos/bston97/tune-goon/pages/builds/latest --jq .status`).
 
-Live at **https://bston97.github.io/forza-tune-builder/**.
+Live at **https://bston97.github.io/tune-goon/**.
+
+**The project is Tune Goon; the page heading is not.** The repo, URL, PWA name
+and docs all say Tune Goon, but the `<h1>` still reads "FH6 Tune Builder" and
+the exported sheet still says "Forza Horizon 6 · Tune Sheet" — that is
+deliberate, asked for directly, not something left half-renamed. The local
+working directory is still `Forza Tune Builder`; renaming it is safe but has to
+happen outside a session, since it is the cwd.
 
 ## Before changing anything
 

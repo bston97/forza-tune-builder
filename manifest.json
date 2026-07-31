@@ -1,6 +1,6 @@
 {
-  "name": "FH6 Tune Builder",
-  "short_name": "Tune Builder",
+  "name": "Tune Goon",
+  "short_name": "Tune Goon",
   "description": "Forza Horizon 6 tuning calculator, fine-tune loop and build planner.",
   "start_url": "./",
   "scope": "./",

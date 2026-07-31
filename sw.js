@@ -1,8 +1,13 @@
-/* FH6 Tune Builder service worker — network-first so a push always wins,
-   cache as the offline fallback. The whole app is one self-contained file with
-   no external requests, so once the shell is cached it works with no signal at
-   all: useful when the phone is sat next to a console rather than on wifi. */
-var CACHE = "fh6-tune-v1";
+/* Tune Goon service worker — network-first so a push always wins, cache as the
+   offline fallback. The whole app is one self-contained file with no external
+   requests, so once the shell is cached it works with no signal at all: useful
+   when the phone is sat next to a console rather than on wifi.
+
+   Bump CACHE whenever the shell needs to be re-fetched rather than served from
+   an old install — the activate handler deletes every cache that isn't the
+   current name. It was bumped for the Tune Goon rename so existing home-screen
+   installs pick up the new manifest instead of the old one. */
+var CACHE = "tune-goon-v1";
 var SHELL = ["./", "./index.html", "./manifest.json",
              "./icon-192.png", "./icon-512.png", "./apple-touch-icon.png", "./favicon-32.png"];
 
