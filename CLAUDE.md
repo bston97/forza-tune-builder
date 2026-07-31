@@ -148,8 +148,37 @@ back and reasonably asked what had changed. The block now defaults to `open`,
 and an unsolved final drive raises a top-level warning rather than a footnote.
 If you ever add another input the tune quietly degrades without, do the same.
 
+**And the third wrong claim, for completeness.** Once the fit worked, the app
+printed the top gear's limiter speed as a predicted top speed: "should read
+about 151 mph". Measured at final drive 4.82 the car did **140.0**. Top gear's
+limiter is a *ceiling*, not a prediction — the car only reaches it if the engine
+still makes power that high, and at 140 mph in that gear it was already at
+~7,600 rpm, past peak. The axis maximum is not reachable either. Nothing in the
+gearing geometry can predict top speed, because none of it knows the power
+curve.
+
+**So geometry picks the starting point and the Performance panel picks the
+setting.** That panel — same screen, left-hand side — reports 0-60, 0-100, Top
+Speed, braking distances and lateral G for whatever is currently set. Those are
+the actual objective. Measured on the GR86:
+
+| final drive | 0-60 | 0-100 | top speed |
+|---|---|---|---|
+| 3.73 | 3.072 | **8.619** | **145.4** |
+| 4.82 | **3.023** | 8.723 | 140.0 |
+
+Shortening improved 0-60 by 0.05s and cost 0.10s of 0-100 plus 5.4 mph, because
+at 4.82 it takes five gears to reach 100 mph instead of four. One extra shift
+outweighed the ratio gain. **`vFrac` = 0.95 for road is therefore suspect and
+under review** — do not treat those constants as settled.
+
+The verified core, which survived all three corrections: per-gear limiter speeds
+from `k/(FD·G)` with `k = axisMax · fdFit · G_top`. Checked against the graph at
+final drive 4.82 — 42/59/76/94/111/129/148 measured, 42/60/77/95/113/130/151
+computed, inside 1.5% across all seven gears.
+
 `gearing.test.js` holds all of it, with the GR86 screen as the reference case,
-including assertions that the discredited claims do not come back.
+including assertions that each discredited claim stays dead.
 
 ### ARB increments
 

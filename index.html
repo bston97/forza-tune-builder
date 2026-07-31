@@ -991,19 +991,24 @@ function compute(i){
   const kSpeed=(fdSrc==='fit'&&isFinite(i.vgraph)&&i.vgraph>0)
     ? i.vgraph*i.fdfit*topGear : null;
   const gearTop=kSpeed ? SPREAD[i.gr].map(g=>kSpeed/(fd*g)) : null;
-  /* The falsifiable claim. Geared at or below the axis maximum the car should
-     reach its top gear's limiter, so predicted top speed is that limiter speed
-     — capped at the axis, which is as fast as the car goes however it is
-     geared. Printed on the card so every build invites the check that caught
-     the last wrong model. */
-  const topPredict=gearTop ? Math.min(gearTop[i.gr-1],i.vgraph) : null;
-  /* And checked outright when a measured top speed is on hand. A real
-     disagreement means an assumption is broken, which is worth saying plainly
-     rather than quietly printing numbers derived from it. */
-  if(topPredict&&isFinite(i.vmax)&&i.vmax>0&&Math.abs(i.vmax-topPredict)/topPredict>0.06)
-    w.push('<b>These numbers do not agree with your top speed.</b> From the fit and the '+
-      Math.round(i.vgraph)+' mph axis this gearing should top out around '+Math.round(topPredict)+
-      ' mph, but you entered '+Math.round(i.vmax)+'. Either the top speed was measured at a different final drive than the fit &mdash; in which case ignore this &mdash; or an assumption behind the gearing maths is wrong and the whole section should be distrusted until it is checked.');
+  /* Where top gear meets the limiter — a ceiling on top speed, NOT a prediction
+     of it. Measured 2026-07-31 on the GR86: at final drive 4.82 top gear
+     redlined at 148 and the car topped out at 140.0, because at 140 in that
+     gear the engine already sits near 7,600 rpm, past peak power. An earlier
+     revision printed this as "the car should top out at about 151 mph" and was
+     out by 11. The axis maximum is not a speed the car can reach either.
+
+     Which is why the app does not pick a final drive off geometry alone: the
+     Performance panel on that same screen reports 0-60, 0-100 and top speed
+     for whatever is set, and those are the numbers being optimised. */
+  const topCeil=gearTop ? gearTop[i.gr-1] : null;
+  /* A measured top speed at or under that ceiling is ordinary — the car is
+     power-limited before the limiter, which is normal. Above it is impossible
+     and means an input is wrong. */
+  if(topCeil&&isFinite(i.vmax)&&i.vmax>topCeil*1.03)
+    w.push('<b>Something does not add up in the gearing inputs.</b> Top gear meets the limiter at '+
+      Math.round(topCeil)+' mph here, so the car cannot do the '+Math.round(i.vmax)+
+      ' you entered &mdash; nothing goes faster than its own rev limiter. Most likely the fit and the top speed were read at different final drives, or the fit is not where top gear actually touched the edge.');
   if(fdSrc==='fit'&&fd>i.fdfit*1.001&&i.gr>=7)
     w.push('<b>Worth counting your gears.</b> If the top one or two were running off the end of the speed graph before this, they were never doing anything &mdash; that is PI spent on ratios the car cannot reach. A '+(i.gr-1)+'-speed geared properly beats a '+i.gr+'-speed with a dead gear on top.');
   if(i.disc==='rally'&&!['rally','offroad'].includes(i.tire)) w.push('<b>Tires:</b> Rally tires are non-negotiable on dirt &mdash; slicks lose more to grip than they save in PI.');
@@ -1063,7 +1068,7 @@ function compute(i){
   const v={};
   for(const k in raw) v[k]= raw[k]==null ? null : snap(k,raw[k]);
 
-  return {i,d,PI,f,w,v,fdSrc,gearTop,topPredict,gears:SPREAD[i.gr]};
+  return {i,d,PI,f,w,v,fdSrc,gearTop,topCeil,gears:SPREAD[i.gr]};
 }
 
 /* ===================== ADJUSTMENT ENGINE ===================== */
@@ -1131,12 +1136,12 @@ function render(){
     (i.trans==='stock'
       ? '<b>No final drive slider on a stock gearbox</b> &mdash; fit at least a Sport transmission before any of this can be entered. The figure below is what to set once you have.<br><br>'
       : '')+
-    ({fit:'<b>Solved off the graph.</b> '+fmt('fd',r.i.fdfit)+' &divide; '+r.d.vFrac.toFixed(2)+
+    ({fit:'<b>Starting point, off the graph.</b> '+fmt('fd',r.i.fdfit)+' &divide; '+r.d.vFrac.toFixed(2)+
         ' &mdash; the setting where top gear just fills the chart, shortened to '+Math.round(r.d.vFrac*100)+
-        '% of maximum for '+d.n+'. Exact for this car: no tire size, no redline, no estimating.'+
+        '% of that for '+d.n+'. The gear speeds below are exact; <b>this final drive is a sensible place to start a sweep, not a final answer</b>, because how much shortening pays depends on the engine\'s power curve and the game will not show you that. Check it against the Performance panel before you keep it.'+
         (r.d.vFrac<1
-          ? ' Top gear will now run out '+Math.round((1-r.d.vFrac)*100)+'% below the car\'s flat-out maximum, and the last line will stop just short of the edge &mdash; that is the trade, not a mistake. You give up a top speed you never reach on '+d.n+' and every gear below it gets shorter.'
-          : ' Top gear runs out right at the car\'s maximum, which is what you want on a strip.'),
+          ? ' The last line will stop '+Math.round((1-r.d.vFrac)*100)+'% short of the right edge rather than on it &mdash; that is deliberate, not a miss.'
+          : ' Top gear runs out right at the edge, which is the reference point itself.'),
       tire:'<b>Solved from redline, tire size and top speed</b> &mdash; rpm &times; circumference &divide; (speed &times; top gear). Close, but it trusts the tire you typed and the top speed reading. Sweeping the final drive until top gear just fits the graph is exact instead, and faster.',
       rough:'<b>Rough estimate from power-to-weight &mdash; do not type this in and drive off.</b> It knows nothing about your tires, gear count or ratios. Sweep the final drive until top gear\'s line just reaches the right edge of the graph, put that setting in the Gearing box on the left, and calculate again.'
      })[r.fdSrc]+
@@ -1146,8 +1151,9 @@ function render(){
       (r.gearTop?' <span style="color:var(--dim)">&middot; to '+Math.round(r.gearTop[n])+' mph</span>':'')+
       '</span></div>').join('')+'</div>'+
     (r.gearTop
-      ? '<div class="note" style="margin-top:8px">Speeds are where each gear meets the limiter at this final drive, from your fit and the '+Math.round(r.i.vgraph)+' mph axis. Every one is reachable &mdash; that is the point of the fit.'+
-        '<br><br><b>Check me on this.</b> With '+fmt('fd',eff('fd'))+' set, the Performance panel should read a Top Speed of about <b>'+Math.round(r.topPredict)+' mph</b>, and the last line should stop '+Math.round((1-r.d.vFrac)*100)+'% short of the right edge rather than on it. If the game says something materially different, the model behind every number in this section is wrong &mdash; that is worth reporting, not working around.</div>'
+      ? '<div class="note" style="margin-top:8px">Speeds are where each gear meets the limiter at this final drive, worked from your fit and the '+Math.round(r.i.vgraph)+' mph axis. Verified against the graph to about 1%, so use them to see where your shifts land &mdash; note which gear you are in at the speeds that matter on your circuit.'+
+        '<br><br><b>Top gear runs out at '+Math.round(r.topCeil)+' mph, but do not read that as top speed.</b> It is a ceiling, not a promise &mdash; the car only gets there if it still makes power that high in the rev range, and often it does not. Measured on a GR86: top gear redlined at 148 and the car did 140.'+
+        '<br><br><b>The Performance panel decides this, not the graph.</b> On the left of that screen the game reports 0&ndash;60, 0&ndash;100 and Top Speed for whatever you have set. Sweep the final drive a few steps either side of this number and read all three: shorter helps 0&ndash;60 and costs top speed, and it starts costing 0&ndash;100 as soon as it forces an extra shift before 100 mph. Take the setting that wins on whichever of those '+r.d.n+' actually rewards.</div>'
       : '')));
 
   const noAlign=locked('camF','camR','toeF','toeR','cast');

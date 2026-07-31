@@ -117,25 +117,21 @@ ok('drag gears the top gear right to the axis maximum',
 ok('no axis maximum means no speeds, not wrong speeds', at({ fdfit: 4.575 }).gearTop === null);
 ok('no fit means no speeds', at({ vgraph: 159 }).gearTop === null);
 
-console.log('--- the model states a falsifiable prediction and checks itself ---');
+console.log('--- top gear\'s limiter is a ceiling, not a predicted top speed ---');
+/* Measured 2026-07-31 at final drive 4.82: top gear redlined at 148 mph and
+   the car did 140.0, because by then the engine is past peak power. A previous
+   revision printed the ceiling as the predicted top speed and was out by 11. */
 r = at({ fdfit: 4.575, vgraph: 159 });
-ok('predicts a top speed', near(r.topPredict, 159 * 0.95, 0.5), r.topPredict.toFixed(1));
-ok('drag predicts the full axis maximum',
-   near(at({ disc: 'drag', tire: 'dragt', fdfit: 4.575, vgraph: 159 }).topPredict, 159, 0.5));
-ok('never predicts past the axis maximum',
-   at({ disc: 'drag', tire: 'dragt', fdfit: 4.0, vgraph: 159 }).topPredict <= 159);
-// a measured top speed that contradicts the model is called out, not absorbed
-r = at({ fdfit: 4.575, vgraph: 159, vmax: 120 });
-ok('flags a top speed the model cannot explain',
-   /do not agree with your top speed/.test(r.w.join(' ')));
-ok('offers the innocent explanation first',
-   /measured at a different final drive/.test(r.w.join(' ')));
-ok('says to distrust the section, not work around it',
-   /distrusted until it is checked/.test(r.w.join(' ')));
-ok('an agreeing top speed passes quietly',
-   !/do not agree with your top speed/.test(at({ fdfit: 4.575, vgraph: 159, vmax: 159 }).w.join(' ')));
-ok('no axis maximum means no check to fail',
-   !/do not agree with your top speed/.test(at({ fdfit: 4.575, vmax: 100 }).w.join(' ')));
+ok('exposes a ceiling', near(r.topCeil, 159 * 0.95, 0.5), r.topCeil.toFixed(1));
+ok('a top speed under the ceiling is normal, not an error',
+   !/does not add up/.test(at({ fdfit: 4.575, vgraph: 159, vmax: 140 }).w.join(' ')));
+ok('a top speed above the ceiling is impossible and flagged',
+   /Something does not add up in the gearing inputs/.test(
+     at({ fdfit: 4.575, vgraph: 159, vmax: 200 }).w.join(' ')));
+ok('the flag names the likely cause',
+   /read at different final drives/.test(at({ fdfit: 4.575, vgraph: 159, vmax: 200 }).w.join(' ')));
+ok('no axis maximum means no ceiling to check',
+   !/does not add up/.test(at({ fdfit: 4.575, vmax: 300 }).w.join(' ')));
 
 console.log('--- the graph is described as it actually behaves ---');
 const set = (id, v) => { document.getElementById(id).value = v; };
@@ -149,19 +145,26 @@ const withMph = els['out'].innerHTML;
 ok('speeds appear beside the ratios', /to 151 mph/.test(withMph),
    (withMph.match(/to \d+ mph/g) || []).join(' '));
 ok('all seven gears annotated', (withMph.match(/to \d+ mph/g) || []).length === 7);
-ok('card invites the check', /Check me on this/.test(withMph));
-ok('card names the top speed to expect', /Top Speed of about <b>151 mph<\/b>/.test(withMph));
-ok('card says what a mismatch means', /the model behind every number in this section is wrong/.test(withMph));
+ok('card calls the ceiling a ceiling', /do not read that as top speed/.test(withMph));
+ok('card cites the measured counter-example', /redlined at 148 and the car did 140/.test(withMph));
+ok('card hands the decision to the Performance panel',
+   /Performance panel decides this, not the graph/.test(withMph));
+ok('card explains the extra-shift cost', /forces an extra shift before 100 mph/.test(withMph));
+ok('card calls the final drive a starting point',
+   /a sensible place to start a sweep, not a final answer/.test(withMph));
 els['save'].onclick();
 ok('sheet carries the speeds too', /class="gear-mph">151</.test(blob.parts[0]));
 set('vgraph', ''); set('fdfit', '4.72'); els['calc'].onclick();
-ok('no invented power curve', !/power curve/.test(page));
+/* The engine's power curve is a real thing and gets mentioned; what must never
+   come back is the claim that one is drawn on this graph and can be lined up. */
+ok('does not put a power curve on the graph',
+   !/power curve (just )?reach|line up the power curve|power curve[^.]{0,40}edge of the/i.test(page));
 ok('says the axis does NOT rescale', /bottom axis does not rescale/.test(page));
 ok('explains that tall gears run off the end', /runs off the right-hand end and is simply not drawn/.test(page));
 ok('does not claim the last gear always touches the edge',
    !/last gear always touches/.test(page) && !/axis rescales as you move/.test(page));
 ok('shows the working', /4\.72 &divide; 0\.95/.test(page));
-ok('explains the deliberate shortfall', /stop just short of the edge/.test(page));
+ok('explains the deliberate shortfall', /short of the right edge rather than on it/.test(page));
 els['save'].onclick();
 const sh = blob.parts[0];
 ok('sheet does not invent a power curve', !/power curve/.test(sh));
