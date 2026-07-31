@@ -158,6 +158,10 @@
   .kv .v{font:600 15px/1.3 ui-monospace,Consolas,monospace;text-align:right;padding:2.5px 0;
          white-space:nowrap}
   .kv .v .u{color:var(--dim);font-size:11.5px;font-weight:400;margin-left:3px}
+  /* A slider the fitted parts don't expose. Said out loud in the cell rather
+     than left blank — an empty value reads as zero, which is a different and
+     much worse claim than "you cannot set this yet". */
+  .kv .v .na{color:var(--dim);font-size:11.5px;font-weight:400;letter-spacing:.3px}
 
   /* editable value inputs */
   input.vi{width:5.2em;background:transparent;border:1px solid transparent;border-radius:4px;
@@ -346,17 +350,32 @@
         show on the Tires tab; gear count is the number in the transmission's name.</div>
 
       <details id="extra">
-        <summary>Optional &mdash; skip unless you already know these</summary>
+        <summary>Gearing &mdash; three numbers off the Gearing tab</summary>
+        <div class="hint" style="margin-bottom:2px">All three are on the Gearing screen at once.
+          Fill them in and the final drive is <b>solved exactly</b> instead of estimated &mdash;
+          tire size and redline cancel out, so neither is needed.</div>
         <div class="row2">
-          <div><label>Tire size</label><input id="tsize" placeholder="275/35R19"></div>
-          <div><label>Redline (rpm)</label><input id="rpm" type="number" inputmode="decimal" placeholder="7400"></div>
+          <div><label>Top speed (mph)</label>
+            <input id="vmax" type="number" inputmode="decimal" placeholder="145.4"></div>
+          <div><label>Graph max (mph)</label>
+            <input id="vgraph" type="number" inputmode="decimal" placeholder="159"></div>
         </div>
-        <label>Top speed (mph)</label>
-        <input id="vmax" type="number" inputmode="decimal" placeholder="191">
-        <div class="hint" style="margin-top:8px">Size from the tire upgrade screen; redline reads
-          off the right edge of the Gearing-tab graph; top speed from the stats screen. All three
-          together solve final drive exactly &mdash; but you dial final drive on the in-game speed
-          graph anyway, so skipping these is fine.</div>
+        <label>Final drive now</label>
+        <input id="fdnow" type="number" inputmode="decimal" step="0.01" placeholder="3.73">
+        <div class="hint" style="margin-top:8px"><b>Top speed</b> is in the Performance panel on the
+          left of that same screen. <b>Graph max</b> is the number under the right-hand end of the
+          speed graph &mdash; that is where your <em>top gear</em> hits the rev limiter, and it moves
+          when you move the final drive. <b>Final drive now</b> is whatever the slider currently
+          reads.</div>
+
+        <div style="border-top:1px solid var(--line);margin-top:12px;padding-top:8px">
+          <div class="hint" style="margin-bottom:2px">Older fallback &mdash; only used if the three
+            above are blank, and it needs a screen you are not on.</div>
+          <div class="row2">
+            <div><label>Tire size</label><input id="tsize" placeholder="275/35R19"></div>
+            <div><label>Redline (rpm)</label><input id="rpm" type="number" inputmode="decimal" placeholder="7400"></div>
+          </div>
+        </div>
       </details>
 
       <div class="btns">
@@ -378,6 +397,7 @@
           <button id="apply">Apply Fix</button>
           <button id="reset">Reset</button>
         </div>
+        <div id="adjmsg" class="hint" style="display:none;margin-top:9px"></div>
         <div id="log" class="log" style="display:none"></div>
       </div>
       <div id="out"><div class="panel empty">Enter the stat block and hit Calculate.</div></div>
@@ -875,23 +895,62 @@ function compute(i){
   else if(diffTier==='street'||diffTier==='sport'){ dfd=drd=dc=null; }   // accel only
 
   /* ---- GEARING ----
-     With tire size, redline and top speed we can solve final drive exactly:
-     engine rpm = 60 · (v/C) · FD · topGear, so FD = rpm·C·3.6 / (60·kmh·topGear).
-     Note the top gear ratio genuinely belongs in there — TuneLab, the only
-     open-source Forza calculator doing gearing, drops it and so lands ~15-40%
-     short on any car whose top gear isn't 1.00 (most of them).
-     Without those three inputs, fall back to the old power-to-weight heuristic. */
+     Confirmed against the real Gearing tab (2022 GR86, A700, 2026-07-31):
+     the graph is rpm-vs-speed with one straight line per gear, and its x-axis
+     maximum is exactly the speed at which the TOP gear meets the rev limiter.
+     The axis rescales as the final drive moves, so the last gear always ends
+     at the right-hand edge — there is no "power curve" on it to line up, and
+     any instruction to do so is describing a graph that does not exist.
+
+     That gives an exact solve needing nothing but numbers on that one screen.
+     Speed at redline in top gear is k/(FD·G_top) for a car-specific k that
+     folds in tire circumference and redline, so:
+
+         k = graphMax · FD_now · G_top    =>    FD_new = FD_now · graphMax
+                                                         ─────────────────
+                                                              v_target
+
+     Tire size, rolling circumference and redline all cancel. Better than the
+     absolute solve below in every way: no second screen, and it self-corrects
+     for whatever the game is actually doing with this car's drivetrain.
+
+     v_target is where we WANT the top gear to run out — vFrac of the car's
+     measured top speed, per discipline. Under 1.0 deliberately: on a circuit
+     you never reach terminal velocity, so gearing to it wastes a gear.
+
+     GUARD: the Top Speed readout is only the car's drag-limited maximum while
+     the gearing can out-run it. Once graphMax ≤ topSpeed the car is sitting on
+     the limiter and the readout is just reporting the gearing back at us —
+     feeding that in would chase its own tail, so it falls through and warns. */
   const topGear=SPREAD[i.gr][i.gr-1];
   const circ=tireCirc(i.tsize);
-  let fd, fdExact=false;
-  if(circ&&isFinite(i.rpm)&&i.rpm>0&&isFinite(i.vmax)&&i.vmax>0){
-    const targetKmh=i.vmax*1.609344*d.vFrac;
-    fd=cl(i.rpm*circ*3.6/(60*targetKmh*topGear),2.20,6.00);
-    fdExact=true;
+  const vTarget=i.vmax*d.vFrac;                      // mph the top gear should redline at
+  const graphOK=isFinite(i.fdnow)&&i.fdnow>0&&isFinite(i.vgraph)&&i.vgraph>0&&
+                isFinite(i.vmax)&&i.vmax>0;
+  /* 2% rather than a hair's breadth: a car that is genuinely drag-limited sits
+     well under its geared maximum, so anything inside a couple of percent is
+     either on the limiter or exactly on the edge of it — and the readout cannot
+     tell those apart. Either way there is nothing safe to solve from. */
+  const revBound=graphOK&&i.vgraph<=i.vmax*1.02;
+  let fd, fdSrc='rough', fdRaw=null;
+  if(graphOK&&!revBound){
+    fdRaw=i.fdnow*i.vgraph/vTarget;
+    fd=cl(fdRaw,2.00,7.00);
+    fdSrc='graph';
+  } else if(circ&&isFinite(i.rpm)&&i.rpm>0&&isFinite(i.vmax)&&i.vmax>0){
+    /* Absolute solve: rpm = 60·(v/C)·FD·G_top, so FD = rpm·C·3.6/(60·kmh·G_top).
+       The top gear ratio genuinely belongs in there — TuneLab, the only
+       open-source Forza calculator doing gearing, drops it and so lands 15-40%
+       short on any car whose top gear isn't 1.00 (most of them). */
+    fd=cl(i.rpm*circ*3.6/(60*vTarget*1.609344*topGear),2.20,6.00);
+    fdSrc='tire';
   } else {
     const pw=i.hp/W*1000;
     fd=cl(d.fd*Math.pow(100/pw,0.12)*(1+(i.gr-6)*0.03),2.20,6.00);
   }
+  /* What the entered graph numbers say about the gearing on the car right now.
+     Only meaningful once both are in — otherwise there is nothing to compare. */
+  const gearGap=graphOK ? i.vgraph/i.vmax : null;
 
   /* ---- AERO ---- */
   /* Compute both ends, then let the fitted-parts gate below decide which
@@ -910,6 +969,22 @@ function compute(i){
   if(i.disc==='touge'&&g>=8) w.push('<b>Gear count:</b> '+g+'-speed on touge &mdash; tight passes never use the spread and it costs PI. Recommend 6&ndash;7.');
   else if(road&&g>=8&&['D','C','B','A'].includes(i.cls)) w.push('<b>Gear count:</b> '+g+'-speed on a '+i.cls+' class road build is overkill &mdash; 8&ndash;10 gears only earn their PI on high-power S1/S2/R. Recommend 6&ndash;7.');
   if(road&&g===4) w.push('<b>Gear count:</b> 4-speed is short for '+DISC[i.disc].n+'. 6&ndash;7 recommended (5 acceptable on low power).');
+  /* What the two graph numbers say about the gearing that is on the car now. */
+  if(revBound)
+    w.push('<b>Top speed and graph max are too close to solve from.</b> The graph runs to '+
+      Math.round(i.vgraph)+' mph and the car does '+Math.round(i.vmax)+
+      ', so the Top Speed readout is just reporting your gearing back &mdash; it cannot see what the car would pull if the gearing let it. '+
+      '<b>Measure it first:</b> lower the final drive until top speed stops climbing. That number is the car\'s real top speed. Then put the final drive back where it was, read Graph max and Final drive now at <em>that</em> setting, and calculate. '+
+      'Lengthening is the measurement, not the answer &mdash; do not leave it there. '+
+      '(If top speed never moves, the gearing was already right and there is nothing to fix.)');
+  if(fdSrc==='graph'&&fdRaw>7.005)
+    w.push('<b>The gearing is further out than one final drive can fix.</b> Solving for '+
+      Math.round(i.vmax*d.vFrac)+' mph wants a final drive of '+fdRaw.toFixed(2)+
+      ', past the top of the slider &mdash; and most cars cap lower than that again. Set it as high as the car allows, then take gears out of the box: fewer, shorter gears is the real fix when the ratio is this far off.');
+  else if(gearGap!=null&&gearGap>1.06)
+    w.push('<b>The top '+Math.round(i.vgraph-i.vmax)+' mph of gearing is dead weight.</b> The graph runs to '+
+      Math.round(i.vgraph)+' mph but the car only reaches '+Math.round(i.vmax)+
+      ', so top gear never sees the limiter. The final drive below pulls that back &mdash; free acceleration in every gear, and no top speed lost, because the car could not reach it anyway.');
   if(i.disc==='rally'&&!['rally','offroad'].includes(i.tire)) w.push('<b>Tires:</b> Rally tires are non-negotiable on dirt &mdash; slicks lose more to grip than they save in PI.');
   if(i.disc==='cc'&&i.tire!=='offroad') w.push('<b>Tires:</b> Cross-country needs off-road tires, max width.');
   if(['rally','cc'].includes(i.disc)&&i.dt!=='AWD') w.push('<b>Drivetrain:</b> AWD is effectively mandatory for '+DISC[i.disc].n+'.');
@@ -967,7 +1042,7 @@ function compute(i){
   const v={};
   for(const k in raw) v[k]= raw[k]==null ? null : snap(k,raw[k]);
 
-  return {i,d,PI,f,w,v,fdExact,gears:SPREAD[i.gr]};
+  return {i,d,PI,f,w,v,fdSrc,gearGap,revBound,gears:SPREAD[i.gr]};
 }
 
 /* ===================== ADJUSTMENT ENGINE ===================== */
@@ -1003,16 +1078,19 @@ function renderLog(){
 }
 
 /* ===================== RENDER ===================== */
+/* Rows for values the fitted parts don't unlock: show the section, say plainly
+   that it isn't adjustable, and let the warning above explain which part.
+   `na` covers the partial case too — one ARB end, or decel on a Sport diff —
+   which used to render as an empty cell indistinguishable from a zero. */
+const na=msg=>'<span class="na">'+(msg||'Not adjustable')+'</span>';
 function vin(k){
-  const v=eff(k); if(v==null) return '';
+  const v=eff(k); if(v==null) return na();
   const m=VMETA[k], mod=ADJ[k]!==undefined?' mod':'';
   return '<input class="vi'+mod+'" data-k="'+k+'" value="'+fmt(k,v)+'">'+
          (m.u?'<span class="u">'+m.u+'</span>':'');
 }
-/* Rows for values the fitted parts don't unlock: show the section, say plainly
-   that it isn't adjustable, and let the warning above explain which part. */
 const locked=(...keys)=>keys.every(k=>eff(k)==null);
-const lockRow=msg=>[['&mdash;',msg||'Not adjustable']];
+const lockRow=msg=>[['&mdash;',na(msg)]];
 
 function sec(c,t,rows,note,extra){
   return '<div class="sec" style="--c:'+c+'"><h3>'+t+'</h3><div class="body"><div class="kv">'+
@@ -1032,10 +1110,23 @@ function render(){
     (i.trans==='stock'
       ? '<b>No final drive slider on a stock gearbox</b> &mdash; fit at least a Sport transmission before any of this can be entered. The figure below is what to set once you have.<br><br>'
       : '')+
-    (r.fdExact
-      ? '<b>Solved from your redline, tire size and top speed</b> &mdash; rpm &times; circumference &divide; (speed &times; top gear), so it should land close first time. Still confirm on track.'
-      : '<b>Rough estimate from power-to-weight.</b> Fill in tire size, redline and top speed in the form and this gets solved exactly instead of guessed.')+
-    ' Move the final drive slider until the power curve just reaches the edge of the speed graph, then confirm the car just touches the limiter in top gear at the end of the longest straight. Bouncing off the limiter early &rarr; lower final drive. Weak corner exit &rarr; raise it.<br><br><b>Leave individual gear ratios at the race-transmission default</b> (shown for reference). Final drive scales all gears together &mdash; do not respace them.',
+    ({graph:'<b>Solved off the gearing graph itself.</b> '+fmt('fd',r.i.fdnow)+' &times; '+
+        Math.round(r.i.vgraph)+' &divide; '+Math.round(r.i.vmax*r.d.vFrac)+' &mdash; your current final drive, scaled by how far the graph currently overshoots where top gear should run out. Tire size and redline cancel, so this is exact for this car, not an estimate. Type it in and the graph max should land near '+Math.round(r.i.vmax*r.d.vFrac)+' mph.'+
+        (r.d.vFrac<1
+          ? ' <b>Top speed will then read about '+Math.round(r.i.vmax*r.d.vFrac)+' rather than '+Math.round(r.i.vmax)+' &mdash; that is the trade, not a mistake:</b> you are giving up '+Math.round(r.i.vmax-r.i.vmax*r.d.vFrac)+' mph you never reach on '+r.d.n+' to shorten every gear below it. Do not feed the new readings back in; the solve is done.'
+          : ' Once set the car sits on the limiter right at its top speed, which is the target here &mdash; do not feed the new readings back in.'),
+      tire:'<b>Solved from redline, tire size and top speed</b> &mdash; rpm &times; circumference &divide; (speed &times; top gear). Close, but it assumes the tire you typed is the one fitted. Reading Graph max and Final drive now straight off the Gearing tab is exact instead.',
+      rough:'<b>Rough estimate from power-to-weight &mdash; treat it as a placeholder.</b> It knows nothing about your tires or gearing, so it can be a long way out. Open the Gearing tab, read Top speed, Graph max and Final drive now into the form, and this gets solved exactly.'
+     })[r.fdSrc]+
+    '<br><br><b>How to read that graph:</b> one straight line per gear, rpm up the side, mph along the bottom. The number under its right-hand edge is the speed your <em>top gear</em> hits the limiter &mdash; and the axis rescales as you move the final drive, so the last gear always touches the edge. There is nothing to line up on it; the edge number <em>is</em> the setting. What you are aiming that number at is the fastest you actually go on this event, not the car\'s flat-out maximum &mdash; for '+d.n+' that is '+Math.round(d.vFrac*100)+'% of top speed, because gearing to a speed you never reach spends a whole gear on nothing.'+
+    (r.gearGap!=null
+      ? '<br><br><b>Right now:</b> graph max '+Math.round(r.i.vgraph)+' mph vs '+Math.round(r.i.vmax)+
+        ' mph of real top speed &mdash; '+
+        (r.revBound ? 'too close to tell apart. Lower the final drive to <em>measure</em> the real top speed, then put it back before reading the numbers off &mdash; see the warning above.'
+         : r.gearGap>1.06 ? 'the last '+Math.round(r.i.vgraph-r.i.vmax)+' mph of gearing is unusable.'
+         : 'close to right; this is a trim, not a rebuild.')
+      : '')+
+    ' Confirm on track: the car should just touch the limiter in top gear at the end of the longest straight. Bouncing off it early &rarr; lower final drive. Weak corner exit &rarr; raise it.<br><br><b>Leave individual gear ratios at the race-transmission default</b> (shown for reference &mdash; these are the game\'s own values). Final drive scales all gears together &mdash; do not respace them.',
     '<div class="gears">'+r.gears.map((g,n)=>'<div class="g"><span>'+(n+1)+(n===0?'st':n===1?'nd':n===2?'rd':'th')+'</span><span>'+g.toFixed(2)+'</span></div>').join('')+'</div>'));
 
   const noAlign=locked('camF','camR','toeF','toeR','cast');
@@ -1074,14 +1165,15 @@ function render(){
       ? 'Damping sliders arrive with race-tier springs and dampers. Without them the car keeps its factory damping whatever the springs are doing.'
       : 'Scaled from critical damping (2&radic;KM) &mdash; heavier, stiffer-sprung corners need more damper, so values track corner weight like the springs do. Bump held at 0.63 &times; rebound (edit rebound and bump follows; edit bump directly and it stops following). Diving/bouncy &rarr; bump too soft. Skipping or telemetry spikes to 100 &rarr; bump too stiff. Roll oscillation or oversteer on turn-in &rarr; rebound too soft; understeer on turn-in &rarr; too stiff.'));
 
-  if(eff('aeF')!=null||eff('aeR')!=null){
-    const rows=[];
-    if(eff('aeF')!=null)rows.push(['Front',vin('aeF')]);
-    if(eff('aeR')!=null)rows.push(['Rear',vin('aeR')]);
-    R.push(sec('var(--aero)','Aero',rows,
-      i.aero==='both'
+  if(!locked('aeF','aeR')){
+    /* Front splitter and rear wing are separate purchases, so name whichever
+       end is actually fitted — the note used to say "rear only" for both. */
+    const bothAero=eff('aeF')!=null&&eff('aeR')!=null, frontOnly=eff('aeR')==null;
+    R.push(sec('var(--aero)','Aero',[['Front',vin('aeF')],['Rear',vin('aeR')]],
+      bothAero
         ? 'Set front to its position, then adjust rear until <b>Aero Balance &mdash; shown on this same tab &mdash; reads 0.42&ndash;0.48, sweet spot 0.45</b>. That reading is the target; the absolute lbs are not. More front = rotation, more rear = stability.'
-        : '<b>Rear aero only.</b> With a fixed front, the in-game balance figure is not a reliable target &mdash; trust mechanical balance from diff, ARB and springs instead.'));
+        : '<b>'+(frontOnly?'Front':'Rear')+' aero only.</b> With a fixed '+(frontOnly?'rear':'front')+
+          ', the in-game balance figure is not a reliable target &mdash; trust mechanical balance from diff, ARB and springs instead.'));
   } else {
     R.push(sec('var(--aero)','Aero',[['&mdash;','No aero']],
       i.disc==='drag'?'Drag build &mdash; minimal/no aero, downforce costs trap speed.'
@@ -1096,19 +1188,30 @@ function render(){
 
   const dr=[]; const noDiff=eff('dfa')==null&&eff('dra')==null;
   if(noDiff){
-    dr.push(['&mdash;','Not adjustable']);
+    dr.push(['&mdash;',na()]);
   } else if(i.dt==='AWD'){
     dr.push(['Front Accel',vin('dfa')],['Front Decel',vin('dfd')],
             ['Rear Accel',vin('dra')],['Rear Decel',vin('drd')]);
     if(eff('dc')!=null) dr.push(['Center',vin('dc')]);
   } else if(i.dt==='FWD'){ dr.push(['Accel',vin('dfa')],['Decel',vin('dfd')]); }
   else { dr.push(['Accel',vin('dra')],['Decel',vin('drd')]); }
+  /* Only claim front decel is "0% by design" when there is a 0 on screen —
+     on a Sport diff the slider doesn't exist at all, which is a different
+     thing to say. Same for the decel advice at the end. */
+  const noDecel=locked('dfd','drd');
   R.push(sec('var(--diff)','Differential',dr,
     noDiff
       ? '<b>Stock differential &mdash; nothing to set.</b> The diff sliders only appear once a Sport diff or better is fitted. It is one of the cheapest handling upgrades on the list; until then this section stays blank.'
-      : (i.dt==='AWD'?'<b>Front decel is 0% by design</b> &mdash; high front decel locks the front axle under braking, kills trail-braking and causes entry understeer. Only raise it for a specific problem (front wheelspin under braking, extreme power, very rear-heavy car). '+
-          (eff('dc')!=null?'Center above 50% = rear bias.':'<b>No centre split on this diff</b> &mdash; that slider needs a Race unit.')+'<br><br>':'')+
-        'Accel scaled to torque and weight &mdash; higher torque needs less lock for the same rotation, and a lighter car rotates more on the same value. <b>Decel deliberately kept low</b>; raise it only from real handling feedback, never as a stability buffer.'));
+      : (i.dt==='AWD'
+          ? (eff('dfd')===0
+              ? '<b>Front decel is 0% by design</b> &mdash; high front decel locks the front axle under braking, kills trail-braking and causes entry understeer. Only raise it for a specific problem (front wheelspin under braking, extreme power, very rear-heavy car). '
+              : eff('dfd')==null
+                ? '<b>Decel lock needs a Race diff</b> &mdash; this unit only exposes the accel side, so entry rotation comes from the bars, springs and brake bias instead. '
+                : '')+
+            (eff('dc')!=null?'Center above 50% = rear bias.':'<b>No centre split on this diff</b> &mdash; that slider needs a Race unit.')+'<br><br>'
+          : '')+
+        'Accel scaled to torque and weight &mdash; higher torque needs less lock for the same rotation, and a lighter car rotates more on the same value.'+
+        (noDecel?'':' <b>Decel deliberately kept low</b>; raise it only from real handling feedback, never as a stability buffer.')));
 
   const nMod=Object.keys(ADJ).length;
   const hd='<div class="panel" style="margin-bottom:9px"><div class="hd">'+
@@ -1282,10 +1385,10 @@ function renderLib(){
   const a=libLoad().slice().sort((x,y)=>y.ts-x.ts);
   const hd='<div class="panel" style="margin-bottom:9px"><div class="hd">'+
     '<div class="nm">Build Library</div><div class="mt">'+a.length+' saved</div></div>'+
-    '<div style="color:var(--dim);font-size:12px">Every build you calculate is saved here automatically, keyed by car + class + discipline. Load one to put its stat block back in the form.</div></div>';
+    '<div style="color:var(--dim);font-size:12px">Saving a sheet files the build here, keyed by car + class + discipline &mdash; calculating alone stays throwaway. Load one to put its stat block back in the form.</div></div>';
   if(!a.length){
     document.getElementById('out').innerHTML=hd+
-      '<div class="panel empty">Nothing saved yet. Calculate a tune and it lands here.</div>';
+      '<div class="panel empty">Nothing saved yet. Calculate a tune, hit Save Sheet, and it lands here.</div>';
     return;
   }
   document.getElementById('out').innerHTML=hd+a.map(b=>{
@@ -1486,6 +1589,13 @@ const SHEET_CSS=`
   }
 
   .section-check { color: #2E2E2E; font-size: 11px; }
+  .section-check.na {
+    color: #6A4A52;
+    font-size: 9px;
+    font-weight: 700;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+  }
   .section-body { padding: 2px 20px 12px; }
 
   /* ── ROWS ── */
@@ -1735,9 +1845,24 @@ function sv(k){
 const row=(l,v,cls)=>'<div class="row"><div class="row-label">'+l+
   '</div><div class="row-value'+(cls?' '+cls:'')+'">'+v+'</div></div>';
 
+/* "a, b and c" */
+const listOf=a=>a.length<2?(a[0]||''):a.slice(0,-1).join(', ')+' and '+a[a.length-1];
+
 function sheet(){
   const r=BASE, i=r.i, d=r.d;
-  const aeroBoth=i.aero==='both', aeroAny=eff('aeF')!=null||eff('aeR')!=null;
+  /* Read the gates off the computed values, not off the form: this is the
+     artifact you type from at the console, so every note below has to be
+     true of the sliders that actually exist on the car. */
+  const aeroAny=!locked('aeF','aeR'), aeroBoth=eff('aeF')!=null&&eff('aeR')!=null;
+  const hasARB=!locked('arF','arR'), oneARB=hasARB&&(eff('arF')==null||eff('arR')==null),
+        hasSpring=!locked('spF','spR'), hasHeight=!locked('rhF','rhR'),
+        hasDamp=!locked('reF','reR','buF','buR'),
+        hasAlign=!locked('camF','camR','toeF','toeR','cast'),
+        hasDiff=!locked('dfa','dfd','dra','drd','dc');
+  /* ✓ means "set this"; a locked section says so in the header instead, so a
+     dashed row can't be mistaken for a value someone forgot to fill in. */
+  const chk=a=>a?'<div class="section-check">✓</div>'
+                :'<div class="section-check na">Not fitted</div>';
 
   /* --- gearing --- */
   const gears=r.gears.map((v,n)=>
@@ -1772,12 +1897,14 @@ function sheet(){
   /* --- aero: front+rear, rear-only, or none --- */
   let aeroBody;
   if(aeroAny){
+    const fixedEnd=eff('aeF')==null?'Front':'Rear';
     aeroBody=(eff('aeF')!=null?row('Front Downforce',sv('aeF'),'val-teal')
                               :row('Front Downforce','Not adjustable','dim'))+
-      row('Rear Downforce',sv('aeR'),'val-teal')+
+      (eff('aeR')!=null?row('Rear Downforce',sv('aeR'),'val-teal')
+                       :row('Rear Downforce','Not adjustable','dim'))+
       '<div class="aero-note">'+(aeroBoth
         ? 'Set front to its position, then adjust rear until <strong>Aero Balance</strong> on the same tab reads <strong>0.42&ndash;0.48</strong>, sweet spot 0.45. That reading is the target; the lbs figures are secondary.'
-        : 'Front is fixed, so the in-game balance figure is <strong>not a reliable target</strong> here &mdash; trust mechanical balance from the diff, ARBs and springs instead.')+'</div>';
+        : fixedEnd+' is fixed, so the in-game balance figure is <strong>not a reliable target</strong> here &mdash; trust mechanical balance from the diff, ARBs and springs instead.')+'</div>';
   } else {
     aeroBody=row('Downforce', i.disc==='drag'?'None &mdash; drag build':'No adjustable aero')+
       '<div class="aero-note">'+(i.disc==='drag'
@@ -1790,11 +1917,37 @@ function sheet(){
   N.push('<p><strong>Tire pressure:</strong> '+(i.disc==='drag'
     ? 'Front sits near the 55 psi cap to cut rolling resistance; rear stays soft for launch traction. If the rear spins through 1st&ndash;2nd, drop another 0.5.'
     : 'Values are cold. Warm target is 32&ndash;34 psi on the tire-temp telemetry screen &mdash; running red, raise 0.5; staying blue, lower 0.5.')+'</p>');
-  N.push('<p><strong>Anti-roll bars</strong> are split proportional to axle load, then trimmed toward rotation. The ARB tab shows <strong>Mechanical Balance</strong> &mdash; target <strong>0.55&ndash;0.65</strong>, sweet spot 0.60. Below 0.55 understeers, above 0.65 goes unstable. Sort it before leaving the tab: soften the end with the problem rather than stiffening the strong end, roughly &plusmn;0.5 ARB per 1% of shift.</p>');
-  N.push('<p><strong>Spring rates</strong> are absolute values from K = M(2&pi;f)&sup2; at a '+r.f.toFixed(2)+' Hz base &mdash; type them straight in and the game clamps if the car\'s range is narrower. The front/rear ratio is already set by corner mass. <strong>Ride height</strong> is a position in the slider range; if the Springs telemetry bars hit 97%+ repeatedly over bumps or curbs, raise 1&ndash;2 clicks.</p>');
-  N.push('<p><strong>Damping</strong> scales from critical damping, so heavier and stiffer-sprung corners get more. Bump is held at 0.63 &times; rebound. Diving or bouncy means bump is too soft; skipping or telemetry spikes to 100 means too stiff.</p>');
-  if(i.dt==='AWD') N.push('<p><strong>Front decel is 0% by design.</strong> High front decel locks the front axle under braking, kills trail-braking and causes entry understeer. Only raise it for a specific problem &mdash; front wheelspin under braking, extreme power, or a very rear-heavy car.</p>');
-  N.push('<p><strong>Final drive:</strong> '+fmt('fd',eff('fd'))+' is a starting estimate. Dial it in-game using the speed graph &mdash; move the slider until the power curve just reaches the edge of the graph. Confirm on track: the car should just hit the rev limiter in top gear at the end of the longest straight. <strong>Bouncing off the limiter early</strong> = lower the final drive (taller gears, more top speed). <strong>Weak exit acceleration</strong> = raise it (shorter gears, more acceleration). Individual gears stay as listed &mdash; only the final drive needs adjusting.</p>');
+  if(hasARB) N.push('<p><strong>Anti-roll bars</strong> are split proportional to axle load, then trimmed toward rotation. '+
+    (oneARB
+      ? 'Only the '+(eff('arF')!=null?'front':'rear')+' bar is fitted, so balance here is half-blind &mdash; it is the <strong>difference</strong> between the two that sets it. Fit the other end before chasing balance with anything else.'
+      : 'The ARB tab shows <strong>Mechanical Balance</strong> &mdash; target <strong>0.55&ndash;0.65</strong>, sweet spot 0.60. Below 0.55 understeers, above 0.65 goes unstable. Sort it before leaving the tab: soften the end with the problem rather than stiffening the strong end, roughly &plusmn;0.5 ARB per 1% of shift.')+'</p>');
+  if(hasSpring||hasHeight) N.push('<p>'+
+    (hasSpring?'<strong>Spring rates</strong> are absolute values from K = M(2&pi;f)&sup2; at a '+r.f.toFixed(2)+' Hz base &mdash; type them straight in and the game clamps if the car\'s range is narrower. The front/rear ratio is already set by corner mass. ':'')+
+    (hasHeight?'<strong>Ride height</strong> is a position in the slider range; if the Springs telemetry bars hit 97%+ repeatedly over bumps or curbs, raise 1&ndash;2 clicks.':'')+'</p>');
+  if(hasDamp) N.push('<p><strong>Damping</strong> scales from critical damping, so heavier and stiffer-sprung corners get more. Bump is held at 0.63 &times; rebound. Diving or bouncy means bump is too soft; skipping or telemetry spikes to 100 means too stiff.</p>');
+  if(i.dt==='AWD'&&eff('dfd')===0) N.push('<p><strong>Front decel is 0% by design.</strong> High front decel locks the front axle under braking, kills trail-braking and causes entry understeer. Only raise it for a specific problem &mdash; front wheelspin under braking, extreme power, or a very rear-heavy car.</p>');
+  N.push('<p><strong>Final drive:</strong> '+
+    (i.trans==='stock'?'no final drive slider exists on a stock gearbox &mdash; fit at least a Sport transmission, then set '+fmt('fd',eff('fd'))+'. ':fmt('fd',eff('fd'))+
+      (r.fdSrc==='graph'?' is solved off the gearing graph, so it is exact for this car. ':
+       r.fdSrc==='tire'?' is solved from redline and tire size. ':' is a rough placeholder from power-to-weight. '))+
+    'On the Gearing tab the graph is one straight line per gear, rpm up the side and mph along the bottom; the number under its right-hand edge is where <strong>top gear</strong> meets the limiter, and it moves as you move the final drive. Aim that edge at '+Math.round(d.vFrac*100)+'% of top speed &mdash; the fastest you actually go on '+d.n+', not the car\'s flat-out maximum'+
+    (r.gearGap!=null?', so roughly '+Math.round(i.vmax*d.vFrac)+' mph here. It read '+Math.round(i.vgraph)+' mph against a real top speed of '+Math.round(i.vmax)+' mph before this change':'')+
+    '. Confirm on track: the car should just touch the limiter in top gear at the end of the longest straight. <strong>Bouncing off the limiter early</strong> = lower the final drive (taller gears, more top speed). <strong>Weak exit acceleration</strong> = raise it (shorter gears, more acceleration). Individual gears stay as listed &mdash; only the final drive needs adjusting.</p>');
+
+  /* The sheet gets read away from the app, so it has to account for its own
+     dashes — otherwise a gated row looks like a bug in the generator. */
+  const gaps=[];
+  if(!hasAlign) gaps.push('camber, toe and caster');
+  if(!hasSpring) gaps.push('spring rate');
+  if(!hasHeight) gaps.push('ride height');
+  if(!hasDamp) gaps.push('bump and rebound');
+  if(!hasARB) gaps.push('both anti-roll bars');
+  else if(oneARB) gaps.push('the '+(eff('arF')==null?'front':'rear')+' anti-roll bar');
+  if(!hasDiff) gaps.push('the entire differential');
+  else if(locked('dfd','drd')) gaps.push('differential decel'+(i.dt==='AWD'&&eff('dc')==null?' and the centre split':''));
+  else if(i.dt==='AWD'&&eff('dc')==null) gaps.push('the centre split');
+  if(gaps.length) N.push('<p><strong>Not adjustable on this build:</strong> '+listOf(gaps)+
+    '. Those rows are dashed because the parts that expose them are not fitted &mdash; not because a value is missing. Everything else above is enterable exactly as printed.</p>');
 
   /* --- adjustments made after the baseline --- */
   const adj=LOG.length ? '<div class="section">'+
@@ -1843,17 +1996,17 @@ function sheet(){
 '      <div class="gear-grid gear-grid-'+i.gr+'">'+gears+'</div>\n'+
 '    </div></div></div>\n'+
 
-'  <div class="section"><div class="section-header sec-align"><div class="section-title">Alignment</div><div class="section-check">✓</div></div>\n'+
+'  <div class="section"><div class="section-header sec-align"><div class="section-title">Alignment</div>'+chk(hasAlign)+'</div>\n'+
 '    <div class="section-body"><div class="grid-table cols-3">\n'+
 '      <div class="gt-cell gt-header"></div><div class="gt-cell gt-header">Camber</div><div class="gt-cell gt-header">Toe</div>\n'+
 '      <div class="gt-cell gt-row-label">Front</div><div class="gt-cell gt-value">'+sv('camF')+'</div><div class="gt-cell gt-value">'+sv('toeF')+'</div>\n'+
 '      <div class="gt-cell gt-row-label">Rear</div><div class="gt-cell gt-value">'+sv('camR')+'</div><div class="gt-cell gt-value">'+sv('toeR')+'</div>\n'+
 '    </div>'+row('Caster',sv('cast'))+'</div></div>\n'+
 
-'  <div class="section"><div class="section-header sec-arb"><div class="section-title">Antiroll Bars</div><div class="section-check">✓</div></div>\n'+
+'  <div class="section"><div class="section-header sec-arb"><div class="section-title">Antiroll Bars</div>'+chk(hasARB)+'</div>\n'+
 '    <div class="section-body">'+row('Front',sv('arF'))+row('Rear',sv('arR'))+'</div></div>\n'+
 
-'  <div class="section"><div class="section-header sec-springs"><div class="section-title">Springs</div><div class="section-check">✓</div></div>\n'+
+'  <div class="section"><div class="section-header sec-springs"><div class="section-title">Springs</div>'+chk(hasSpring||hasHeight)+'</div>\n'+
 '    <div class="section-body"><div class="sub-label">Spring Rate <span class="dim">— type the value in; the game clamps to range</span></div>'+
        row('Front',sv('spF'))+row('Rear',sv('spR'))+
 '      <div class="sub-label">Ride Height</div>'+
@@ -1861,20 +2014,20 @@ function sheet(){
        row('Rear', sv('rhR')+(eff('rhR')===0?' <span class="dim">minimum</span>':''))+
 '    </div></div>\n'+
 
-'  <div class="section"><div class="section-header sec-damping"><div class="section-title">Damping</div><div class="section-check">✓</div></div>\n'+
+'  <div class="section"><div class="section-header sec-damping"><div class="section-title">Damping</div>'+chk(hasDamp)+'</div>\n'+
 '    <div class="section-body"><div class="grid-table cols-3">\n'+
 '      <div class="gt-cell gt-header"></div><div class="gt-cell gt-header">Rebound</div><div class="gt-cell gt-header">Bump</div>\n'+
 '      <div class="gt-cell gt-row-label">Front</div><div class="gt-cell gt-value">'+sv('reF')+'</div><div class="gt-cell gt-value">'+sv('buF')+'</div>\n'+
 '      <div class="gt-cell gt-row-label">Rear</div><div class="gt-cell gt-value">'+sv('reR')+'</div><div class="gt-cell gt-value">'+sv('buR')+'</div>\n'+
 '    </div></div></div>\n'+
 
-'  <div class="section"><div class="section-header sec-aero"><div class="section-title">Aero</div><div class="section-check">✓</div></div>\n'+
+'  <div class="section"><div class="section-header sec-aero"><div class="section-title">Aero</div>'+chk(aeroAny)+'</div>\n'+
 '    <div class="section-body">'+aeroBody+'</div></div>\n'+
 
 '  <div class="section"><div class="section-header sec-brakes"><div class="section-title">Brakes</div><div class="section-check">✓</div></div>\n'+
 '    <div class="section-body">'+row('Balance',sv('bal'))+row('Pressure',sv('pres'))+'</div></div>\n'+
 
-'  <div class="section"><div class="section-header sec-diff"><div class="section-title">Differential — '+i.dt+'</div><div class="section-check">✓</div></div>\n'+
+'  <div class="section"><div class="section-header sec-diff"><div class="section-title">Differential — '+i.dt+'</div>'+chk(hasDiff)+'</div>\n'+
 '    <div class="section-body">'+diffBody+'</div></div>\n'+
 
 adj+
@@ -1890,7 +2043,7 @@ const slug=s=>s.toLowerCase().replace(/[^a-z0-9]+/g,'_').replace(/^_+|_+$/g,'')|
 
 /* ===================== WIRE-UP ===================== */
 const FIELDS=['name','year','cls','disc','wt','fw','hp','tq','dt','pi','gr','tire','aero','twf','twr',
-              'susp','arb','trans','diff','tsize','rpm','vmax'];
+              'susp','arb','trans','diff','vmax','vgraph','fdnow','tsize','rpm'];
 let restored=false;
 try{
   const s=JSON.parse(localStorage.getItem('fh6last')||'null');
@@ -1945,10 +2098,20 @@ else applyAutoParts(true);
    would be actively wrong here, since the tune needs post-upgrade weight, power
    and distribution. So "search" means search what you have already entered:
    your own finished builds, which are by definition the right numbers. */
+/* Dropdowns have no empty option, so a record written before a field existed
+   would leave the select with nothing selected — which reads back as '' and
+   goes on to poison the tune (a missing tire compound gives NaN pressures).
+   Text and number fields still clear, since blank is a legal state for them. */
+function selDefault(k,r){
+  if(k==='tire'||k==='aero'||k==='susp') return autoParts(r.cls||'A',r.disc||'road')[k];
+  return {cls:'A',disc:'road',dt:'RWD',gr:'6',twf:'0',twr:'0',
+          arb:'both',trans:'sport',diff:'race'}[k];
+}
 function applyFields(r){
   FIELDS.forEach(k=>{
-    const el=document.getElementById(k);
-    if(el) el.value=(r[k]!=null?r[k]:'');   // clear fields the record didn't set — no stale carry-over
+    const el=document.getElementById(k); if(!el) return;
+    const v=r[k], d=selDefault(k,r);
+    el.value=(v!=null&&v!=='') ? v : (d!==undefined?d:'');
   });
   // rebase the auto-parts tracker so a later class change can't clobber the
   // loaded record's tire/aero choices
@@ -1998,6 +2161,7 @@ document.getElementById('find').onclick=()=>{
   }
 
   document.getElementById('adjust').style.display='none';
+  document.getElementById('save').disabled=true;
   document.getElementById('out').innerHTML=
     '<div class="panel"><div class="hd"><div class="nm">'+hits.length+' matches</div></div>'+
     '<div style="color:var(--dim);font-size:12px">Starting points restore the build plan; finished builds restore the tune.</div>'+
@@ -2030,7 +2194,8 @@ function readForm(needStats){
   const i={name:g('name').trim(),year:g('year').trim(),cls:g('cls'),disc:g('disc'),wt:n('wt'),fw:n('fw'),
            hp:n('hp'),tq:n('tq'),dt:g('dt'),pi:n('pi'),gr:parseInt(g('gr')),tire:g('tire'),
            aero:g('aero'),twf:n('twf'),twr:n('twr'),susp:g('susp'),arb:g('arb'),trans:g('trans'),diff:g('diff'),
-           tsize:g('tsize').trim(),rpm:n('rpm'),vmax:n('vmax')};
+           tsize:g('tsize').trim(),rpm:n('rpm'),vmax:n('vmax'),
+           vgraph:n('vgraph'),fdnow:n('fdnow')};
   const req=needStats ? [['wt','Weight'],['fw','Front %'],['hp','HP'],['tq','Torque']]
                       : [['wt','Weight'],['hp','HP']];
   for(const [k,lbl] of req){
@@ -2054,9 +2219,18 @@ function showResults(){
   }
 }
 
+/* Save Sheet exports BASE, so it must only be live while BASE is what's on
+   screen — otherwise a plan for car B sits there with a working Save button
+   that quietly files car A. Calculate is the way back to the tune, which is
+   why an unchanged stat block reuses the existing baseline rather than
+   recomputing: returning from the Library must not discard fine-tuning. */
+const formSig=i=>JSON.stringify(FIELDS.map(k=>i[k]==null?'':String(i[k])));
+let SIG=null;
+
 document.getElementById('calc').onclick=()=>{
   const i=readForm(true); if(!i) return;
-  BASE=compute(i); ADJ={}; LOG=[];        // new baseline clears adjustments
+  const sig=formSig(i);
+  if(!BASE||sig!==SIG){ BASE=compute(i); SIG=sig; ADJ={}; LOG=[]; adjMsg(''); }
   render(); renderLog();
   document.getElementById('save').disabled=false;
   document.getElementById('adjust').style.display='';
@@ -2066,6 +2240,7 @@ document.getElementById('calc').onclick=()=>{
 document.getElementById('plan').onclick=()=>{
   const i=readForm(false); if(!i) return;
   document.getElementById('adjust').style.display='none';
+  document.getElementById('save').disabled=true;
   renderPlan(i);
   // planning a car is the moment its starting stats are on screen — keep them,
   // so Find can hand them straight back next time instead of retyping
@@ -2075,6 +2250,7 @@ document.getElementById('plan').onclick=()=>{
 
 document.getElementById('lib').onclick=()=>{
   document.getElementById('adjust').style.display='none';
+  document.getElementById('save').disabled=true;
   renderLib();
   VIEW='lib'; showResults();
 };
@@ -2084,7 +2260,7 @@ document.getElementById('lib').onclick=()=>{
    the next car's brake balance and "exact" final drive. Class, event and the
    visible dropdowns stay: they're the context you're building in. */
 document.getElementById('newcar').onclick=()=>{
-  ['name','year','wt','fw','hp','tq','pi','tsize','rpm','vmax']
+  ['name','year','wt','fw','hp','tq','pi','tsize','rpm','vmax','vgraph','fdnow']
     .forEach(id=>{ document.getElementById(id).value=''; });
   document.getElementById('twf').value='0'; document.getElementById('twr').value='0';
   document.getElementById('trans').value='sport'; document.getElementById('diff').value='race';
@@ -2098,16 +2274,29 @@ document.getElementById('newcar').onclick=()=>{
   document.getElementById('name').focus();
 };
 
+const adjMsg=html=>{
+  const m=document.getElementById('adjmsg');
+  m.innerHTML=html||''; m.style.display=html?'':'none';
+};
+
 document.getElementById('apply').onclick=()=>{
   if(!BASE) return;
   const key=document.getElementById('sym').value, fx=FIX[key];
   const deltas=(fx.d||[]).concat(fx.dyn?fx.dyn(BASE.i.dt):[]);
-  if(applyDeltas(deltas,fx.l)){ render(); renderLog(); }
+  if(applyDeltas(deltas,fx.l)){ adjMsg(''); render(); renderLog(); return; }
+  /* Nothing moved — which is two very different situations, and silence
+     reads as a broken button in both. Say which one it was. */
+  const keys=deltas.map(d=>d[0]), nm=ks=>ks.map(k=>VMETA[k].n).join(', ');
+  adjMsg(keys.every(k=>eff(k)==null)
+    ? '<b>Nothing to change.</b> This fix works on '+nm(keys)+
+      ' &mdash; none of those sliders exist on the parts fitted. The warnings below say which part unlocks them.'
+    : '<b>Nothing left to give.</b> '+nm(keys.filter(k=>eff(k)!=null))+
+      ' already sit at the end of the game\'s range, so this fix has nowhere further to go. Try the opposite end of the car instead.');
 };
 
 document.getElementById('reset').onclick=()=>{
   if(!BASE) return;
-  ADJ={}; LOG=[]; render(); renderLog();
+  ADJ={}; LOG=[]; adjMsg(''); render(); renderLog();
 };
 
 // manual edits on any output value
