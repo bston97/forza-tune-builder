@@ -356,12 +356,18 @@
           any taller and it runs off the end, which is gearing the car cannot use. Type that
           setting here and the final drive is <b>solved exactly</b>. Leave it blank and the number
           below is only a guess.</div>
-        <label>Final drive where top gear just fits</label>
-        <input id="fdfit" type="number" inputmode="decimal" step="0.01" placeholder="4.72">
+        <div class="row2">
+          <div><label>Final drive where top gear just fits</label>
+            <input id="fdfit" type="number" inputmode="decimal" step="0.01" placeholder="4.58"></div>
+          <div><label>Graph max (mph) <span class="hint">opt.</span></label>
+            <input id="vgraph" type="number" inputmode="decimal" placeholder="159"></div>
+        </div>
         <div class="hint" style="margin-top:8px">Sweep the slider and watch the last line: too tall
           and it disappears past the edge, too short and it stops well before it. You want it
           landing on the edge. That is one sweep with the graph telling you when you are there
-          &mdash; no tire size, no redline, no arithmetic.</div>
+          &mdash; no tire size, no redline, no arithmetic. <b>Graph max</b> is the number under the
+          right-hand end of that axis; it never moves, and adding it makes the gear list below
+          show the speed every gear runs out at.</div>
 
         <div style="border-top:1px solid var(--line);margin-top:12px;padding-top:8px">
           <div class="hint" style="margin-bottom:2px">Optional &mdash; sharpens the notes, and gives
@@ -968,7 +974,19 @@ function compute(i){
     w.push('<b>Further out than one final drive can fix.</b> Gearing to '+
       Math.round(d.vFrac*100)+'% of maximum from a fit of '+i.fdfit.toFixed(2)+
       ' wants '+fdRaw.toFixed(2)+', past the top of the slider &mdash; and most cars cap lower again. Set it as high as the car allows, then take gears out of the box: fewer, shorter gears is the real fix when the spread is this far off.');
-  /* Gears the chart cannot even show are gears the car cannot use. */
+  /* With the fit and the axis maximum we know this car's speed constant, and
+     every gear's limiter speed falls out of it:
+
+         speed at redline in gear G = k / (FD · G),  k = axisMax · fdFit · G_top
+
+     Confirmed end-to-end on the GR86: k = 159 × 4.575 × 0.82 = 596.5 puts 5th
+     at final drive 3.73 at 145.4 mph, which is exactly the Top Speed the game
+     reported for that setup — the car was rev-limited in 5th with 6th and 7th
+     unreachable. Two dead gears, and the readout was measuring the limiter
+     rather than the car. */
+  const kSpeed=(fdSrc==='fit'&&isFinite(i.vgraph)&&i.vgraph>0)
+    ? i.vgraph*i.fdfit*topGear : null;
+  const gearTop=kSpeed ? SPREAD[i.gr].map(g=>kSpeed/(fd*g)) : null;
   if(fdSrc==='fit'&&fd>i.fdfit*1.001&&i.gr>=7)
     w.push('<b>Worth counting your gears.</b> If the top one or two were running off the end of the speed graph before this, they were never doing anything &mdash; that is PI spent on ratios the car cannot reach. A '+(i.gr-1)+'-speed geared properly beats a '+i.gr+'-speed with a dead gear on top.');
   if(i.disc==='rally'&&!['rally','offroad'].includes(i.tire)) w.push('<b>Tires:</b> Rally tires are non-negotiable on dirt &mdash; slicks lose more to grip than they save in PI.');
@@ -1028,7 +1046,7 @@ function compute(i){
   const v={};
   for(const k in raw) v[k]= raw[k]==null ? null : snap(k,raw[k]);
 
-  return {i,d,PI,f,w,v,fdSrc,gears:SPREAD[i.gr]};
+  return {i,d,PI,f,w,v,fdSrc,gearTop,gears:SPREAD[i.gr]};
 }
 
 /* ===================== ADJUSTMENT ENGINE ===================== */
@@ -1107,7 +1125,10 @@ function render(){
      })[r.fdSrc]+
     '<br><br><b>How to read that graph:</b> one straight line per gear, rpm up the side, mph along the bottom, each line ending where that gear meets the limiter. <b>The bottom axis does not rescale</b> &mdash; its range is fixed by the car, so a gear geared taller than the chart runs off the right-hand end and is simply not drawn. A top gear you cannot see is a gear the car can never use, and one you can barely see is nearly that. Sweep the final drive until that last line lands on the edge: that is the whole reading, and it needs no numbers off the screen at all.'+
     ' Confirm on track: the car should just touch the limiter in top gear at the end of the longest straight. Bouncing off it early &rarr; lower final drive. Weak corner exit &rarr; raise it.<br><br><b>Leave individual gear ratios at the race-transmission default</b> (shown for reference &mdash; these are the game\'s own values). Final drive scales all gears together &mdash; do not respace them.',
-    '<div class="gears">'+r.gears.map((g,n)=>'<div class="g"><span>'+(n+1)+(n===0?'st':n===1?'nd':n===2?'rd':'th')+'</span><span>'+g.toFixed(2)+'</span></div>').join('')+'</div>'));
+    '<div class="gears">'+r.gears.map((g,n)=>'<div class="g"><span>'+(n+1)+(n===0?'st':n===1?'nd':n===2?'rd':'th')+'</span><span>'+g.toFixed(2)+
+      (r.gearTop?' <span style="color:var(--dim)">&middot; to '+Math.round(r.gearTop[n])+' mph</span>':'')+
+      '</span></div>').join('')+'</div>'+
+    (r.gearTop?'<div class="note" style="margin-top:8px">Speeds are where each gear meets the limiter at this final drive, from your fit and the '+Math.round(r.i.vgraph)+' mph axis. Every one is reachable &mdash; that is the point of the fit.</div>':'')));
 
   const noAlign=locked('camF','camR','toeF','toeR','cast');
   R.push(sec('var(--align)','Alignment',
@@ -1659,6 +1680,10 @@ const SHEET_CSS=`
   }
 
   .gear-num { font-size: 9px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: #6E6E6E; }
+  /* Where that gear meets the limiter — only present when the fit and the axis
+     maximum are both known, so the sheet degrades to bare ratios without it. */
+  .gear-mph { font-size: 9px; font-weight: 600; color: #5E5E5E; margin-top: 1px; }
+  .gear-mph::after { content: ' MPH'; letter-spacing: 0.06em; }
   .gear-val { font-size: 14px; font-weight: 700; color: #D0D0D0; font-family: 'Barlow Condensed', sans-serif; margin-top: 2px; }
 
   /* ── GRID TABLE ── */
@@ -1847,7 +1872,9 @@ function sheet(){
   /* --- gearing --- */
   const gears=r.gears.map((v,n)=>
     '<div class="gear-item"><div class="gear-num">'+ORD(n+1)+
-    '</div><div class="gear-val">'+v.toFixed(2)+'</div></div>').join('');
+    '</div><div class="gear-val">'+v.toFixed(2)+'</div>'+
+    (r.gearTop?'<div class="gear-mph">'+Math.round(r.gearTop[n])+'</div>':'')+
+    '</div>').join('');
 
   /* --- differential: layout depends on drivetrain --- */
   let diffBody;
@@ -2023,7 +2050,7 @@ const slug=s=>s.toLowerCase().replace(/[^a-z0-9]+/g,'_').replace(/^_+|_+$/g,'')|
 
 /* ===================== WIRE-UP ===================== */
 const FIELDS=['name','year','cls','disc','wt','fw','hp','tq','dt','pi','gr','tire','aero','twf','twr',
-              'susp','arb','trans','diff','fdfit','vmax','tsize','rpm'];
+              'susp','arb','trans','diff','fdfit','vgraph','vmax','tsize','rpm'];
 let restored=false;
 try{
   const s=JSON.parse(localStorage.getItem('fh6last')||'null');
@@ -2175,7 +2202,7 @@ function readForm(needStats){
            hp:n('hp'),tq:n('tq'),dt:g('dt'),pi:n('pi'),gr:parseInt(g('gr')),tire:g('tire'),
            aero:g('aero'),twf:n('twf'),twr:n('twr'),susp:g('susp'),arb:g('arb'),trans:g('trans'),diff:g('diff'),
            tsize:g('tsize').trim(),rpm:n('rpm'),vmax:n('vmax'),
-           fdfit:n('fdfit')};
+           fdfit:n('fdfit'),vgraph:n('vgraph')};
   const req=needStats ? [['wt','Weight'],['fw','Front %'],['hp','HP'],['tq','Torque']]
                       : [['wt','Weight'],['hp','HP']];
   for(const [k,lbl] of req){
@@ -2240,7 +2267,7 @@ document.getElementById('lib').onclick=()=>{
    the next car's brake balance and "exact" final drive. Class, event and the
    visible dropdowns stay: they're the context you're building in. */
 document.getElementById('newcar').onclick=()=>{
-  ['name','year','wt','fw','hp','tq','pi','tsize','rpm','vmax','fdfit']
+  ['name','year','wt','fw','hp','tq','pi','tsize','rpm','vmax','fdfit','vgraph']
     .forEach(id=>{ document.getElementById(id).value=''; });
   document.getElementById('twf').value='0'; document.getElementById('twr').value='0';
   document.getElementById('trans').value='sport'; document.getElementById('diff').value='race';

@@ -93,12 +93,45 @@ ok('a 6-speed is not', !/Worth counting your gears/.test(at({ gr: 6, fdfit: 4.72
 ok('drag, geared exactly to the fit, is not',
    !/Worth counting your gears/.test(at({ disc: 'drag', tire: 'dragt', fdfit: 4.72 }).w.join(' ')));
 
+console.log('--- per-gear limiter speeds, from the fit plus the axis maximum ---');
+/* Confirmed end to end on the reference car: k = 159 x 4.575 x 0.82 = 596.5,
+   which puts 5th at final drive 3.73 at 145.4 mph — exactly the Top Speed the
+   game reported for that setup. The car was rev-limited in 5th with 6th (168)
+   and 7th (195) both past the 159 mph axis and therefore unreachable. */
+const K = 159 * 4.575 * 0.82;
+ok('k from the reference screen', near(K, 596.5, 0.1), K.toFixed(1));
+ok('5th at fd 3.73 reproduces the 145.4 mph readout',
+   near(K / (3.73 * 1.10), 145.4, 0.1), (K / (3.73 * 1.10)).toFixed(2));
+ok('6th at fd 3.73 sits past the 159 axis', K / (3.73 * 0.95) > 159, (K / (3.73 * 0.95)).toFixed(1));
+ok('7th at fd 3.73 sits far past it', K / (3.73 * 0.82) > 190, (K / (3.73 * 0.82)).toFixed(1));
+
+r = at({ fdfit: 4.575, vgraph: 159 });
+ok('gear speeds computed', Array.isArray(r.gearTop) && r.gearTop.length === 7);
+ok('top gear lands at vFrac of the axis maximum',
+   near(r.gearTop[6], 159 * 0.95, 0.5), r.gearTop[6].toFixed(1));
+ok('every gear is reachable at the solved final drive',
+   r.gearTop.every(v => v <= 159), r.gearTop.map(v => Math.round(v)).join('/'));
+ok('speeds fall in gear order', r.gearTop.every((v, n) => n === 0 || v > r.gearTop[n - 1]));
+ok('drag gears the top gear right to the axis maximum',
+   near(at({ disc: 'drag', tire: 'dragt', fdfit: 4.575, vgraph: 159 }).gearTop[6], 159, 0.5));
+ok('no axis maximum means no speeds, not wrong speeds', at({ fdfit: 4.575 }).gearTop === null);
+ok('no fit means no speeds', at({ vgraph: 159 }).gearTop === null);
+
 console.log('--- the graph is described as it actually behaves ---');
 const set = (id, v) => { document.getElementById(id).value = v; };
 Object.keys(GR86).forEach(k => set(k, typeof GR86[k] === 'number' && isNaN(GR86[k]) ? '' : GR86[k]));
 set('fdfit', '4.72');
 els['calc'].onclick();
 const page = els['out'].innerHTML;
+ok('gear list shows speeds when the axis maximum is known', !/to \d+ mph/.test(page));
+set('vgraph', '159'); set('fdfit', '4.575'); els['calc'].onclick();
+const withMph = els['out'].innerHTML;
+ok('speeds appear beside the ratios', /to 151 mph/.test(withMph),
+   (withMph.match(/to \d+ mph/g) || []).join(' '));
+ok('all seven gears annotated', (withMph.match(/to \d+ mph/g) || []).length === 7);
+els['save'].onclick();
+ok('sheet carries the speeds too', /class="gear-mph">151</.test(blob.parts[0]));
+set('vgraph', ''); set('fdfit', '4.72'); els['calc'].onclick();
 ok('no invented power curve', !/power curve/.test(page));
 ok('says the axis does NOT rescale', /bottom axis does not rescale/.test(page));
 ok('explains that tall gears run off the end', /runs off the right-hand end and is simply not drawn/.test(page));
