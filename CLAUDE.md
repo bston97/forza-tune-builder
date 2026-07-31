@@ -101,45 +101,55 @@ is. Rough tiers, most to least trustworthy:
    (see gearing below), brake-bias-per-width-step, the `vFrac` per-discipline
    targets, most of the `carNotes()` discipline-fit thresholds.
 
-### Gearing — settled 2026-07-31 against the real screen
+### Gearing — and a worked example of getting it wrong
 
-A photo of the Gearing tab (2022 GR86, A 700) established what the graph
-actually is, and it is not what earlier versions of this app claimed:
+The Gearing tab's graph plots **rpm against speed, one straight line per gear**.
+There is no power curve on it, so the long-standing instruction to "move the
+final drive until the power curve reaches the edge of the graph" was describing
+something that does not exist.
 
-- It plots **rpm against speed, one straight line per gear**. There is no power
-  curve on it. Any instruction to "move the final drive until the power curve
-  reaches the edge of the graph" is describing a graph that does not exist —
-  that text shipped for a while and was wrong.
-- Its **x-axis maximum is the speed at which the top gear meets the limiter**,
-  and the axis rescales as the final drive moves, so the last gear always ends
-  at the right edge. The edge number *is* the reading, not a target to line up.
-- The `SPREAD` tables are the game's own race-box ratios — the 7-speed on that
-  screen was 2.92/2.05/1.60/1.30/1.10/0.95/0.82, matching `SPREAD[7]` exactly.
-  So only the final drive needs solving; leave the ratios alone.
+**The bottom axis does not rescale.** Its range is a property of the car, not of
+the gearing, so a gear geared taller than the chart runs off the right-hand end
+and is not drawn at all. Confirmed on Boston's screen 2026-07-31: a 7-speed
+GR86 at final drive 3.73, axis reading 159 mph, **no 7th gear visible and only
+the tail of 6th** — consistent with 6th ending at the edge and 7th at
+159 × 0.95/0.82 ≈ 184 mph.
 
-That gives an exact solve from three numbers on that one screen — top speed,
-graph max, current final drive — with tire circumference and redline cancelling
-out: `FD_new = FD_now × graphMax / (topSpeed × vFrac)`. Prefer it over both
-older paths. The tire-size/redline solve still works but needs a second screen
-and trusts the tire you typed; the power-to-weight fallback is a placeholder
-that knew nothing about tires or gearing and was badly out on the reference car
-(3.73 against a correct 4.29).
+So the reading is visual and needs no numbers: sweep the final drive until the
+top gear's line just reaches the right edge. At that setting top gear redlines
+at the car's maximum usable speed — call it `fdFit` — and since speed at redline
+goes as 1/FD, gearing to `vFrac` of that maximum is just `FD = fdFit / vFrac`.
 
-**The one trap:** the Top Speed readout is only the car's drag-limited maximum
-while the gearing can out-run it. Once the car is on the limiter, that readout
-just echoes the gearing back, and solving from it chases its own tail — hence
-the `revBound` guard (2%).
+The `SPREAD` tables are the game's own race-box ratios: the 7-speed on that
+screen was 2.92/2.05/1.60/1.30/1.10/0.95/0.82, matching `SPREAD[7]` exactly. So
+only the final drive is ever solved; leave the ratios alone.
 
-That guard has a subtlety worth not undoing. Because the solve only runs when
-there is a gap, and a gap always means over-geared, **it only ever shortens** —
-so applying its answer puts the car on the limiter at `vFrac` of top speed,
-which then trips `revBound` on a re-read. That is correct and intended, not a
-bug, but it means both the warning and the card must say so: lengthening is a
-*measurement* step to recover the true top speed, never the setting to leave
-it at, and once the answer is applied you do not feed the new readings back in.
-Any rewrite of that copy has to keep that, or the app talks the user in a
-circle. `gearing.test.js` holds all of it, with the GR86 screen as the
-reference case.
+**How this got shipped wrong, because the failure mode will recur.** An earlier
+revision inferred from a photo that the axis *rescaled* with the gearing, so the
+top gear always touched the edge — and built an exact-looking ratio solve
+(`FD_now × graphMax / target`) plus card copy stating there was "nothing to line
+up". Boston caught it in one line: *"I don't see 7th gear even on the chart and
+6 is barely on there."* Three lessons worth keeping:
+
+1. **A blurry photo is not a reading.** The gear-endpoint spacing was measured
+   off a phone picture taken at an angle and matched the wrong model about as
+   well as the right one. Perspective distortion ate the difference.
+2. **The wrong version was more confident than the right one**, because it
+   produced a tidy closed-form answer. Tidiness is not evidence.
+3. **The original text had the right action under the wrong noun.** "Until it
+   reaches the edge of the graph" was correct about the edge and wrong about
+   what reaches it. Rewriting inherited text, check whether the part being
+   discarded was the part that was true.
+
+**The other trap, which cost a whole cycle:** the field feeding this lived in a
+collapsed `<details>`, so it stayed blank, the power-to-weight guess ran, and
+the only hint was body text under the number. Boston got the same wrong 3.73
+back and reasonably asked what had changed. The block now defaults to `open`,
+and an unsolved final drive raises a top-level warning rather than a footnote.
+If you ever add another input the tune quietly degrades without, do the same.
+
+`gearing.test.js` holds all of it, with the GR86 screen as the reference case,
+including assertions that the discredited claims do not come back.
 
 ### ARB increments
 

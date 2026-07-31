@@ -26,15 +26,13 @@ lb/in — type the number in and the game clamps it if the car's range is narrow
 height and aero work off discipline targets plus the in-game verification readings.
 
 Final drive is solved off the game's own gearing graph. That graph plots rpm against
-speed, one straight line per gear, and its x-axis maximum is the speed at which the *top*
-gear meets the limiter — so reading three numbers from that one screen (top speed, graph
-max, current final drive) gives `FD_new = FD_now × graphMax / (topSpeed × vFrac)`, with
-tire circumference and redline cancelling out entirely. Falls back to a tire-size solve,
-then to a power-to-weight estimate, when those aren't supplied.
-
-The one catch it guards: the Top Speed readout is only the car's drag-limited maximum
-while the gearing can out-run it. Once the car is on the limiter that readout just echoes
-the gearing back, so a limiter-bound reading is refused rather than solved from.
+speed, one straight line per gear, and its bottom axis does *not* rescale — the range is
+fixed by the car, so a gear geared taller than the chart runs off the right-hand end and
+isn't drawn at all. Sweep the final drive until the top gear's line just reaches that
+edge and it redlines at the car's maximum usable speed; from there `FD = fdFit / vFrac`
+gears it to whatever fraction of maximum the discipline wants. One number, read visually,
+no tire size or redline needed. Falls back to a tire-size solve, then to a power-to-weight
+estimate, when it isn't supplied — and says loudly when it has.
 
 **Fine-tuning.** After driving, pick what the car did from a symptom list (understeer on
 turn-in, wheelspin on exit, bottoming out, tires cooking, hits the limiter early — 23 in
