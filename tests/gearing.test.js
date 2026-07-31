@@ -36,6 +36,13 @@ const GR86 = { name: 'GR86', cls: 'A', disc: 'road', wt: 2900, fw: 53, hp: 350, 
 const at = o => X.compute(Object.assign({}, GR86, o));
 
 console.log('--- the gear table is the game\'s own 7-speed race box ---');
+/* Boston asked whether the fit is measured with the app's ratios or the game's
+   defaults. They are the same table — the app never asks for ratios, only for
+   the final drive — and only the TOP ratio affects the fit, since that is the
+   line whose endpoint lands in the corner. */
+ok('the app never asks for individual ratios',
+   !/id="g[1-9]"|id="gear[1-9]"/.test(require('fs').readFileSync(
+     require('path').join(__dirname, '..', 'index.html'), 'utf8')));
 ok('SPREAD[7] matches the screen',
    JSON.stringify(X.SPREAD[7]) === JSON.stringify([2.92, 2.05, 1.60, 1.30, 1.10, 0.95, 0.82]),
    X.SPREAD[7].join(' / '));
@@ -85,7 +92,7 @@ ok('warns at the top of the card, not in the notes',
    /final drive below is a guess, not a tune/.test(r.w.join(' ')));
 ok('names the real failure it caused', /3\.73 where the real answer was nearer 4\.7/.test(r.w.join(' ')));
 ok('tells you the one sweep that fixes it',
-   /top gear's line just reaches the right-hand edge/.test(r.w.join(' ')));
+   /top gear's line finishes in the top-right corner/.test(r.w.join(' ')));
 ok('a solved build does not carry the warning',
    !/is a guess, not a tune/.test(at({ fdfit: 4.72 }).w.join(' ')));
 ok('a stock gearbox does not nag about it',
@@ -137,7 +144,7 @@ ok('predicts the stub instead of claiming it vanishes',
 ok('sizes the stub', /about 3 mph of line before the edge/.test(r.w.join(' ')),
    (r.w.join(' ').match(/about \d+ mph of line/) || [])[0]);
 ok('says a stub is not a usable gear', /the shift point drawn, not a gear you use/.test(r.w.join(' ')));
-ok('card explains stub vs vanished', /a stub is not the gear fitting/.test(
+ok('card explains stub vs vanished', /still climbing<\/em> as it reaches the edge/.test(
    (() => { const s = (id, v) => { document.getElementById(id).value = v; };
      Object.keys(GR86).forEach(k => s(k, typeof GR86[k] === 'number' && isNaN(GR86[k]) ? '' : GR86[k]));
      s('fdfit', '4.575'); s('vgraph', '157'); els['calc'].onclick();

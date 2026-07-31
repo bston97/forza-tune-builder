@@ -352,22 +352,24 @@
       <details id="extra" open>
         <summary>Gearing &mdash; one number off the Gearing tab</summary>
         <div class="hint" style="margin-bottom:2px">On the Gearing tab, raise the final drive until
-          the <b>top gear's line just reaches the right-hand edge</b> of the speed graph &mdash;
-          any taller and it runs off the end, which is gearing the car cannot use. Type that
-          setting here and the final drive is <b>solved exactly</b>. Leave it blank and the number
-          below is only a guess.</div>
+          the <b>top gear's line finishes in the top-right corner</b> &mdash; meeting the rev-limiter
+          line at the same moment it reaches the right-hand edge. Type that setting here and the
+          final drive is <b>solved exactly</b>. Leave it blank and the number below is only a guess.</div>
         <div class="row2">
           <div><label>Final drive where top gear just fits</label>
             <input id="fdfit" type="number" inputmode="decimal" step="0.01" placeholder="4.58"></div>
           <div><label>Graph max (mph) <span class="hint">opt.</span></label>
             <input id="vgraph" type="number" inputmode="decimal" placeholder="159"></div>
         </div>
-        <div class="hint" style="margin-top:8px">Sweep the slider and watch the last line: too tall
-          and it disappears past the edge, too short and it stops well before it. You want it
-          landing on the edge. That is one sweep with the graph telling you when you are there
-          &mdash; no tire size, no redline, no arithmetic. <b>Graph max</b> is the number under the
-          right-hand end of that axis; it never moves, and adding it makes the gear list below
-          show the speed every gear runs out at.</div>
+        <div class="hint" style="margin-top:8px"><b>Careful here:</b> a line cut off <em>by</em> the
+          edge touches it too, so "reaches the edge" is not the test. Watch where the line stops
+          climbing. Too tall and it is still rising when the edge chops it off &mdash; or it has
+          vanished entirely. Too short and it flattens onto the limiter well before the edge. You
+          want the corner: still climbing right up to the edge, arriving at the limiter exactly
+          there. Leave the individual ratios alone throughout &mdash; only the top one affects this,
+          and it is the game's own value.<br><br><b>Graph max</b> is the number under the right-hand
+          end of that axis. It never moves, and adding it makes the gear list below show the speed
+          every gear runs out at.</div>
 
         <div style="border-top:1px solid var(--line);margin-top:12px;padding-top:8px">
           <div class="hint" style="margin-bottom:2px">Optional &mdash; cross-checks the gearing, and
@@ -987,7 +989,7 @@ function compute(i){
      was a line of body text under the number. Say it at the top instead. */
   if(fdSrc==='rough'&&i.trans!=='stock')
     w.push('<b>The final drive below is a guess, not a tune.</b> It is extrapolated from power-to-weight and knows nothing about your tires, your gear count or your ratios, so it can be badly out &mdash; on a 7-speed GR86 it returned 3.73 where the real answer was nearer 4.7. '+
-      '<b>Fix it in one sweep:</b> on the Gearing tab, raise the final drive until the <em>top gear\'s line just reaches the right-hand edge</em> of the speed graph, put that setting in the Gearing box on the left, and calculate again.');
+      '<b>Fix it in one sweep:</b> on the Gearing tab, raise the final drive until the <em>top gear\'s line finishes in the top-right corner</em> &mdash; still climbing right up to the edge, meeting the limiter exactly there, not cut off by it. Put that setting in the Gearing box on the left and calculate again.');
   if(fdSrc==='fit'&&fdRaw>7.005)
     w.push('<b>Further out than one final drive can fix.</b> Gearing to '+
       Math.round(d.vFrac*100)+'% of maximum from a fit of '+i.fdfit.toFixed(2)+
@@ -1211,7 +1213,7 @@ function render(){
       tire:'<b>Solved from redline, tire size and top speed</b> &mdash; rpm &times; circumference &divide; (speed &times; top gear). Close, but it trusts the tire you typed and the top speed reading. Sweeping the final drive until top gear just fits the graph is exact instead, and faster.',
       rough:'<b>Rough estimate from power-to-weight &mdash; do not type this in and drive off.</b> It knows nothing about your tires, gear count or ratios. Sweep the final drive until top gear\'s line just reaches the right edge of the graph, put that setting in the Gearing box on the left, and calculate again.'
      })[r.fdSrc]+
-    '<br><br><b>How to read that graph:</b> one straight line per gear, rpm up the side, mph along the bottom, each line ending where that gear meets the limiter. <b>The bottom axis does not rescale</b> &mdash; its range is fixed by the car, so a gear taller than the chart runs off the right-hand end. Each line starts where the gear below it runs out, so a too-tall top gear shows as a <em>stub</em> at the top right if that shift point is still on the chart, and vanishes entirely once it is not &mdash; a stub is not the gear fitting. Finding where the last line lands on that edge is the <em>reference point</em>, not the answer: the car cannot reach the edge, so the setting worth running is longer than that and the top gear disappears off the end on purpose.'+
+    '<br><br><b>How to read that graph:</b> one straight line per gear, rpm up the side, mph along the bottom, each line ending where that gear meets the limiter. <b>The bottom axis does not rescale</b> &mdash; its range is fixed by the car, so a gear taller than the chart runs off the right-hand end. Each line starts where the gear below it runs out, so a too-tall top gear shows as a <em>stub</em> at the top right if that shift point is still on the chart, and vanishes entirely once it is not. A stub still touches the edge, so that is not the test &mdash; the fit is when the last line is <em>still climbing</em> as it reaches the edge and meets the limiter exactly in the corner. That fit is the <em>reference point</em>, not the answer: the car cannot reach the edge, so the setting worth running is longer than that and the top gear disappears off the end on purpose.'+
     '<br><br>Confirm on track by feel rather than by the limiter &mdash; on a car geared this way you may never see it. Weak drive out of corners &rarr; raise the final drive. Running out of gear down the longest straight &rarr; lower it. <b>Leave individual gear ratios at the race-transmission default</b> (shown for reference &mdash; these are the game\'s own values). Final drive scales all gears together &mdash; do not respace them.',
     '<div class="gears">'+r.gears.map((g,n)=>'<div class="g"><span>'+(n+1)+(n===0?'st':n===1?'nd':n===2?'rd':'th')+'</span><span>'+g.toFixed(2)+
       (r.gearTop?' <span style="color:var(--dim)">&middot; to '+Math.round(r.gearTop[n])+' mph</span>':'')+
