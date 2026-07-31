@@ -98,6 +98,24 @@ ok('a solved build does not carry the warning',
 ok('a stock gearbox does not nag about it',
    !/is a guess, not a tune/.test(at({ trans: 'stock' }).w.join(' ')));
 
+console.log('--- top speed is a diagnostic, not an input ---');
+/* Since the tire solve went, vmax feeds no calculation at all. It exists to
+   answer one question — which gears actually get used — and the form says so,
+   or someone will think it is required. */
+{
+  const without = at({ fdfit: 4.575, vgraph: 157 });
+  const with_ = at({ fdfit: 4.575, vgraph: 157, vmax: 141.5 });
+  ok('changes no tune value',
+     Object.keys(without.v).every(k => without.v[k] === with_.v[k]));
+  ok('changes no gear speed',
+     JSON.stringify(without.gearTop) === JSON.stringify(with_.gearTop));
+  ok('turns on the only thing it is for',
+     without.topsIn === null && with_.topsIn === 7);
+  ok('and the form admits it changes nothing',
+     /<b>This changes no tune value<\/b>/.test(require('fs').readFileSync(
+       require('path').join(__dirname, '..', 'index.html'), 'utf8')));
+}
+
 console.log('--- two paths only: the fit, or an admitted guess ---');
 /* The tire-size + redline solve was removed 2026-07-31. It wanted three numbers
    off in-game screens to produce a worse answer than the fit's one, and you

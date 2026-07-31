@@ -376,12 +376,14 @@
         <div style="border-top:1px solid var(--line);margin-top:12px;padding-top:8px">
           <label>Top speed at that setting <span class="hint">opt.</span></label>
           <input id="vmax" type="number" inputmode="decimal" placeholder="143.5">
-          <div class="hint" style="margin-top:8px">Second pass: set the final drive this gives you,
-            read Top Speed back off the Performance panel, enter it, calculate again. That is what
-            says which gear you run out in and whether the top one ever engages. It has to be read
-            at the <b>same</b> final drive the gear speeds are worked out for &mdash; top speed
-            moves with the gearing &mdash; and it will land well under Graph max, because the end
-            of the axis is not a speed the car reaches.</div>
+          <div class="hint" style="margin-top:8px"><b>This changes no tune value</b> &mdash; not the
+            final drive, not the gear speeds. It buys one thing: which gear you actually run out
+            in, and whether the top one ever engages. Worth a second pass for that alone, since a
+            gear that never comes in is PI you are not using.<br><br>Set the final drive this gives
+            you, read Top Speed off the Performance panel, enter it, calculate again. It must be
+            read at the <b>same</b> final drive &mdash; top speed moves with the gearing &mdash;
+            and it will land well under Graph max, because the end of the axis is not a speed the
+            car reaches.</div>
         </div>
       </details>
 
