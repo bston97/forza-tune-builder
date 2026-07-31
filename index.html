@@ -353,10 +353,13 @@
 
       <details id="extra" open>
         <summary>Gearing &mdash; one number off the Gearing tab</summary>
-        <div class="hint" style="margin-bottom:2px">On the Gearing tab, raise the final drive until
-          the <b>top gear's line finishes in the top-right corner</b> &mdash; meeting the rev-limiter
-          line at the same moment it reaches the right-hand edge. Type that setting here and the
-          final drive is <b>solved exactly</b>. Leave it blank and the number below is only a guess.</div>
+        <div class="hint" style="margin-bottom:2px">Three readings off the Gearing tab, each doing a
+          different job: <b>fit</b> and <b>graph max</b> multiply together into this car's speed
+          constant &mdash; neither works without the other &mdash; and <b>top speed</b> is what top
+          gear gets aimed at. With all three you can set any final drive you like and get ratios
+          that fit it.<br><br>For the fit: raise the final drive until the <b>top gear's line
+          finishes in the top-right corner</b>, meeting the rev-limiter line at the same moment it
+          reaches the right-hand edge.</div>
         <div class="row2">
           <div><label>Final drive where top gear just fits</label>
             <input id="fdfit" type="number" inputmode="decimal" step="0.01" placeholder="4.58"></div>
@@ -376,14 +379,13 @@
         <div style="border-top:1px solid var(--line);margin-top:12px;padding-top:8px">
           <label>Top speed at that setting <span class="hint">opt.</span></label>
           <input id="vmax" type="number" inputmode="decimal" placeholder="143.5">
-          <div class="hint" style="margin-top:8px"><b>This changes no tune value</b> &mdash; not the
-            final drive, not the gear speeds. It buys one thing: which gear you actually run out
-            in, and whether the top one ever engages. Worth a second pass for that alone, since a
-            gear that never comes in is PI you are not using.<br><br>Set the final drive this gives
-            you, read Top Speed off the Performance panel, enter it, calculate again. It must be
-            read at the <b>same</b> final drive &mdash; top speed moves with the gearing &mdash;
-            and it will land well under Graph max, because the end of the axis is not a speed the
-            car reaches.</div>
+          <div class="hint" style="margin-top:8px">This is what top gear gets aimed at, so it
+            <b>drives the ratio set</b> and tells you which gears actually engage. Leave it blank
+            and you still get limiter speeds per gear, but no ratios and no verdict.<br><br>Set a
+            final drive, read Top Speed off the Performance panel, enter it, calculate again. It
+            must be read at the <b>same</b> final drive you are running &mdash; top speed moves
+            with the gearing &mdash; and it will land well under Graph max, because the end of the
+            axis is not a speed the car reaches.</div>
         </div>
       </details>
 

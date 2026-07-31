@@ -34,6 +34,14 @@ const GR86 = { name: 'GR86', cls: 'A', disc: 'road', wt: 2900, fw: 53, hp: 350, 
   dt: 'RWD', gr: 7, tire: 'sport', aero: 'both', twf: 0, twr: 0, susp: 'race', arb: 'both',
   trans: 'race', diff: 'race', vmax: NaN, fdfit: NaN };
 const at = o => X.compute(Object.assign({}, GR86, o));
+const HTML = require('fs').readFileSync(require('path').join(__dirname, '..', 'index.html'), 'utf8');
+const set = (id, v) => { document.getElementById(id).value = v; };
+const draw = o => {
+  Object.keys(GR86).forEach(k => set(k, typeof GR86[k] === 'number' && isNaN(GR86[k]) ? '' : GR86[k]));
+  Object.keys(o).forEach(k => set(k, o[k]));
+  els['calc'].onclick();
+  return els['out'].innerHTML;
+};
 
 console.log('--- the gear table is the game\'s own 7-speed race box ---');
 /* Boston asked whether the fit is measured with the app's ratios or the game's
@@ -98,22 +106,34 @@ ok('a solved build does not carry the warning',
 ok('a stock gearbox does not nag about it',
    !/is a guess, not a tune/.test(at({ trans: 'stock' }).w.join(' ')));
 
-console.log('--- top speed is a diagnostic, not an input ---');
-/* Since the tire solve went, vmax feeds no calculation at all. It exists to
-   answer one question — which gears actually get used — and the form says so,
-   or someone will think it is required. */
+console.log('--- each of the three inputs does a distinct job ---');
+/* Boston asked whether any of the three could go now that he sets the final
+   drive himself. None can: fit x graph max IS the speed constant, so neither
+   works alone, and top speed is what top gear gets aimed at.
+
+   Note top speed used to change nothing at all — that was true for about an
+   hour, between the tire solve being removed and ratioSet arriving. The form
+   said so, and that claim went stale the moment ratios started depending on
+   it. Hence this test. */
 {
   const without = at({ fdfit: 4.575, vgraph: 157 });
   const with_ = at({ fdfit: 4.575, vgraph: 157, vmax: 141.5 });
-  ok('changes no tune value',
+  ok('top speed still changes no slider value',
      Object.keys(without.v).every(k => without.v[k] === with_.v[k]));
-  ok('changes no gear speed',
-     JSON.stringify(without.gearTop) === JSON.stringify(with_.gearTop));
-  ok('turns on the only thing it is for',
+  ok('and no limiter speed', JSON.stringify(without.gearTop) === JSON.stringify(with_.gearTop));
+  ok('but it does decide the used/unused verdict',
      without.topsIn === null && with_.topsIn === 7);
-  ok('and the form admits it changes nothing',
-     /<b>This changes no tune value<\/b>/.test(require('fs').readFileSync(
-       require('path').join(__dirname, '..', 'index.html'), 'utf8')));
+  ok('and it does decide the ratio set',
+     !/Or set these ratios/.test(draw({ fdfit: '4.58', vgraph: '157', vmax: '' })) &&
+     /Or set these ratios/.test(draw({ fdfit: '4.58', vgraph: '157', vmax: '141.5' })));
+  ok('the form no longer claims it changes nothing',
+     !/This changes no tune value/.test(HTML));
+  ok('and says what it actually drives', /drives the ratio set/.test(HTML));
+
+  ok('the fit alone gives nothing', at({ fdfit: 4.575 }).gearTop === null);
+  ok('graph max alone gives nothing', at({ vgraph: 157 }).gearTop === null);
+  ok('the two together are the anchor', at({ fdfit: 4.575, vgraph: 157 }).kSpeed > 0);
+  ok('the form explains they multiply', /multiply together into this car's speed\s+constant/.test(HTML));
 }
 
 console.log('--- two paths only: the fit, or an admitted guess ---');
@@ -196,13 +216,6 @@ ok('no axis maximum means no ceiling to check',
 console.log('--- the card leads with the setting, not an essay ---');
 /* What shipped before this: a 179 mph figure beside 7th on a car doing 141,
    under 450 words of prose arguing with itself. The number is what gets read. */
-const set = (id, v) => { document.getElementById(id).value = v; };
-const draw = o => {
-  Object.keys(GR86).forEach(k => set(k, typeof GR86[k] === 'number' && isNaN(GR86[k]) ? '' : GR86[k]));
-  Object.keys(o).forEach(k => set(k, o[k]));
-  els['calc'].onclick();
-  return els['out'].innerHTML;
-};
 const gearBlock = h => (h.match(/<div class="gears">[\s\S]*?<\/div><\/div>/) || [''])[0];
 const words = h => { const g = h.indexOf('>Gearing</h3>'), n = h.indexOf('<div class="sec"', g);
   return h.slice(g, n).replace(/<[^>]+>/g, ' ').split(/\s+/).filter(Boolean).length; };
