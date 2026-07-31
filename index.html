@@ -290,15 +290,17 @@
 
       <label>Tire width <span class="hint">— only the front/rear <b>difference</b> matters</span></label>
       <div class="row2">
+        <!-- Width upgrades run stock to +3 in game — a +4 option shipped here
+             for a while and was wrong (Boston, 2026-07-31). -->
         <div><select id="twf">
             <option value="0" selected>Front: stock</option>
             <option value="1">Front: +1 step</option><option value="2">Front: +2</option>
-            <option value="3">Front: +3</option><option value="4">Front: +4</option>
+            <option value="3">Front: +3</option>
           </select></div>
         <div><select id="twr">
             <option value="0" selected>Rear: stock</option>
             <option value="1">Rear: +1 step</option><option value="2">Rear: +2</option>
-            <option value="3">Rear: +3</option><option value="4">Rear: +4</option>
+            <option value="3">Rear: +3</option>
           </select></div>
       </div>
 
@@ -377,15 +379,20 @@
           every gear runs out at.</div>
 
         <div style="border-top:1px solid var(--line);margin-top:12px;padding-top:8px">
-          <label>Top speed at that setting <span class="hint">opt.</span></label>
-          <input id="vmax" type="number" inputmode="decimal" placeholder="143.5">
-          <div class="hint" style="margin-top:8px">This is what top gear gets aimed at, so it
-            <b>drives the ratio set</b> and tells you which gears actually engage. Leave it blank
-            and you still get limiter speeds per gear, but no ratios and no verdict.<br><br>Set a
-            final drive, read Top Speed off the Performance panel, enter it, calculate again. It
-            must be read at the <b>same</b> final drive you are running &mdash; top speed moves
-            with the gearing &mdash; and it will land well under Graph max, because the end of the
-            axis is not a speed the car reaches.</div>
+          <div class="row2">
+            <div><label>Final drive you run <span class="hint">opt.</span></label>
+              <input id="fdset" type="number" inputmode="decimal" step="0.01" placeholder="4.58"></div>
+            <div><label>Top speed at it <span class="hint">opt.</span></label>
+              <input id="vmax" type="number" inputmode="decimal" placeholder="143.5"></div>
+          </div>
+          <div class="hint" style="margin-top:8px">These two are a <b>pair</b> &mdash; set whatever
+            final drive you like in game, read Top Speed off the Performance panel right there, and
+            enter both together. Everything below (gear speeds, which gears engage, the ratio set)
+            is then worked out at <em>your</em> setting, and top gear gets aimed at the top speed
+            you actually recorded. Leave the final drive blank and the app falls back to the fit;
+            leave top speed blank and you still get limiter speeds, but no ratios and no verdict.
+            Expect top speed well under Graph max &mdash; the end of the axis is not a speed the
+            car reaches.</div>
         </div>
       </details>
 
@@ -1004,7 +1011,16 @@ function compute(i){
      easy to get wrong after a width upgrade. */
   const topGear=SPREAD[i.gr][i.gr-1];
   let fd, fdSrc='rough', fdRaw=null;
-  if(isFinite(i.fdfit)&&i.fdfit>0){
+  if(isFinite(i.fdset)&&i.fdset>0){
+    /* The user's own final drive wins outright. This field exists because the
+       app used to judge the entered top speed against the ceiling at its OWN
+       recommendation — so anyone running a longer final drive than the rec got
+       "something does not add up" on perfectly correct inputs, every build.
+       The pair (fdset, vmax) is read together at one setting, and everything
+       downstream is computed at that setting. */
+    fd=cl(i.fdset,2.00,7.00);
+    fdSrc='user';
+  } else if(isFinite(i.fdfit)&&i.fdfit>0){
     fdRaw=i.fdfit/d.vFrac;
     fd=cl(fdRaw,2.00,7.00);
     fdSrc='fit';
@@ -1050,7 +1066,10 @@ function compute(i){
      reported for that setup — the car was rev-limited in 5th with 6th and 7th
      unreachable. Two dead gears, and the readout was measuring the limiter
      rather than the car. */
-  const kSpeed=(fdSrc==='fit'&&isFinite(i.vgraph)&&i.vgraph>0)
+  /* The speed constant needs the fit and the axis — NOT the fit to be the
+     chosen final drive. A user-set final drive still gets full gear speeds,
+     verdicts and ratios, as long as the two anchor readings exist. */
+  const kSpeed=(isFinite(i.fdfit)&&i.fdfit>0&&isFinite(i.vgraph)&&i.vgraph>0)
     ? i.vgraph*i.fdfit*topGear : null;
   /* Derived at whatever final drive is being asked about, so the card can
      recompute against a hand-edited one. compute() answers for its own
@@ -1079,9 +1098,9 @@ function compute(i){
      power-limited before the limiter, which is normal. Above it is impossible
      and means an input is wrong. */
   if(topCeil&&isFinite(i.vmax)&&i.vmax>topCeil*1.03)
-    w.push('<b>Something does not add up in the gearing inputs.</b> At the final drive below, top gear meets the limiter at '+
-      Math.round(topCeil)+' mph, so the car cannot do the '+Math.round(i.vmax)+
-      ' you entered &mdash; nothing goes faster than its own rev limiter. Almost certainly the top speed was read at a <em>different</em> final drive than this one; it has to come from the setting the app is recommending, since top speed moves with the gearing.');
+    w.push('<b>Top speed and final drive disagree.</b> At '+fmt('fd',fd)+
+      ', top gear meets the limiter at '+Math.round(topCeil)+' mph, so the car cannot do the '+
+      Math.round(i.vmax)+' you entered &mdash; nothing goes faster than its own rev limiter. The two have to be read as a pair, at the same setting: whatever final drive is on the car when you read Top Speed is the one to put in <b>Final drive you run</b>.');
   /* The dead-gear finding lives in the gear list now, beside the ratio it is
      about, rather than as five sentences of red above it. A warning strip is
      for things that are wrong; a gear you cannot reach is just a fact about
@@ -1238,11 +1257,13 @@ function render(){
       : '')+
     '',
     '<div class="note" style="margin-top:0;padding-top:0;border:0">'+
-    ({fit:'<b>Set '+fmt('fd',eff('fd'))+'</b> &mdash; '+
+    ({user:'<b>Your final drive: '+fmt('fd',eff('fd'))+'.</b> Kept exactly as entered &mdash; everything below is computed at it'+
+        (r.kSpeed?'':' (add the fit and Graph max to get per-gear speeds and ratios)')+'.',
+      fit:'<b>Set '+fmt('fd',eff('fd'))+'</b> &mdash; '+
         (r.d.vFrac===1
           ? '<b>your fit unchanged</b>, since '+d.n+' gears right at the fit.'
           : 'your fit of '+fmt('fd',r.i.fdfit)+' &divide; '+r.d.vFrac.toFixed(2)+' for '+d.n+'.')+
-        ' Or set your own and the table below follows it. Either way sweep <b>'+band+'</b> against the Performance panel &mdash; 0&ndash;60, 0&ndash;100 and Top Speed are on the left of that screen, and they beat two decimals from me.',
+        ' Or enter your own under <b>Final drive you run</b> and everything follows it. Either way sweep <b>'+band+'</b> against the Performance panel &mdash; 0&ndash;60, 0&ndash;100 and Top Speed are on the left of that screen, and they beat two decimals from me.',
       rough:'<b>A guess from power-to-weight. Do not drive off on it.</b> Sweep the final drive until top gear\'s line finishes in the graph\'s top-right corner &mdash; still climbing as it reaches the right edge &mdash; put that setting in the Gearing box on the left, and calculate again.'
      })[r.fdSrc]+'</div>'+
     '<div class="gears">'+r.gears.map((g,n)=>'<div class="g"><span>'+ORDN(n+1)+'</span><span>'+g.toFixed(2)+
@@ -2078,7 +2099,8 @@ function sheet(){
   if(i.dt==='AWD'&&eff('dfd')===0) N.push('<p><strong>Front decel is 0% by design.</strong> High front decel locks the front axle under braking, kills trail-braking and causes entry understeer. Only raise it for a specific problem &mdash; front wheelspin under braking, extreme power, or a very rear-heavy car.</p>');
   N.push('<p><strong>Final drive:</strong> '+
     (i.trans==='stock'?'no final drive slider exists on a stock gearbox &mdash; fit at least a Sport transmission, then set '+fmt('fd',eff('fd'))+'. ':fmt('fd',eff('fd'))+
-      (r.fdSrc==='fit'?' is solved off the graph, so it is exact for this car. ':
+      (r.fdSrc==='user'?' is your own setting, kept as entered, with the gear figures worked out at it. ':
+       r.fdSrc==='fit'?' is solved off the graph, so it is exact for this car. ':
        ' is a rough placeholder from power-to-weight &mdash; verify it on the graph before trusting it. '))+
     'On the Gearing tab the graph is one straight line per gear, rpm up the side and mph along the bottom. <strong>Its bottom axis does not rescale</strong> &mdash; the range is fixed by the car, so any gear taller than the chart runs off the right-hand end and is not drawn. Sweeping until the top gear lands on that edge gives the reference point; the setting here sits '+
     (d.vFrac>1?Math.round((d.vFrac-1)*100)+'% <strong>longer</strong> than it, with top gear off the end of the chart on purpose &mdash; the car cannot reach that edge, so gearing to it wastes the top of the box.'
@@ -2194,7 +2216,7 @@ const slug=s=>s.toLowerCase().replace(/[^a-z0-9]+/g,'_').replace(/^_+|_+$/g,'')|
 
 /* ===================== WIRE-UP ===================== */
 const FIELDS=['name','year','cls','disc','wt','fw','hp','tq','dt','pi','gr','tire','aero','twf','twr',
-              'susp','arb','trans','diff','fdfit','vgraph','vmax'];
+              'susp','arb','trans','diff','fdfit','vgraph','fdset','vmax'];
 let restored=false;
 try{
   const s=JSON.parse(localStorage.getItem('fh6last')||'null');
@@ -2345,7 +2367,7 @@ function readForm(needStats){
   const i={name:g('name').trim(),year:g('year').trim(),cls:g('cls'),disc:g('disc'),wt:n('wt'),fw:n('fw'),
            hp:n('hp'),tq:n('tq'),dt:g('dt'),pi:n('pi'),gr:parseInt(g('gr')),tire:g('tire'),
            aero:g('aero'),twf:n('twf'),twr:n('twr'),susp:g('susp'),arb:g('arb'),trans:g('trans'),diff:g('diff'),
-           vmax:n('vmax'),fdfit:n('fdfit'),vgraph:n('vgraph')};
+           vmax:n('vmax'),fdfit:n('fdfit'),vgraph:n('vgraph'),fdset:n('fdset')};
   const req=needStats ? [['wt','Weight'],['fw','Front %'],['hp','HP'],['tq','Torque']]
                       : [['wt','Weight'],['hp','HP']];
   for(const [k,lbl] of req){
@@ -2410,7 +2432,7 @@ document.getElementById('lib').onclick=()=>{
    the next car's brake balance and "exact" final drive. Class, event and the
    visible dropdowns stay: they're the context you're building in. */
 document.getElementById('newcar').onclick=()=>{
-  ['name','year','wt','fw','hp','tq','pi','vmax','fdfit','vgraph']
+  ['name','year','wt','fw','hp','tq','pi','vmax','fdfit','vgraph','fdset']
     .forEach(id=>{ document.getElementById(id).value=''; });
   document.getElementById('twf').value='0'; document.getElementById('twr').value='0';
   document.getElementById('trans').value='sport'; document.getElementById('diff').value='race';

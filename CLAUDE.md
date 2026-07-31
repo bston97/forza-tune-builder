@@ -65,6 +65,17 @@ treat `null` as "not adjustable," never as zero or blank-string. See the
 `gates.test.js` suite for the full matrix — extend it if you add a new
 gated part.
 
+**The gating matrix itself is FH5 carryover and has never been confirmed on an
+FH6 screen.** Audited 2026-07-31 at Boston's request: ForzaTune's guide does not
+cover part-to-slider unlocks at all, and no other credible source exists. The
+two load-bearing, most-likely-wrong claims are (1) Street/Sport suspension =
+spring rate + ride height but NO damping/alignment, and (2) Street/Sport diff =
+accel only, no decel. Each is a 30-second in-game check: fit the part, open the
+tuning menu, see which sliders exist. If Boston reports a difference, fix
+`compute()`'s gate and `gates.test.js` together. Confirmed FH6 facts so far:
+tire width upgrades run **stock to +3** (a +4 option shipped for a while and
+was wrong), ARB steps 0.1, and everything in the gearing section.
+
 **The prose has to be gated too, not just the values.** This is the failure
 mode that actually shipped: values correctly rendered as `—` while the notes
 beside them went on coaching a slider the car does not have — an exported sheet
@@ -215,6 +226,18 @@ shift point drawn rather than the gear fitting. Without a measured top speed
 there is nothing honest to compare against, since the axis sits ~13 mph above
 anything the car reaches; `compute()` says so and asks for the number rather
 than guessing.
+
+### The final drive is the user's input, not the app's output
+
+The last recurring gearing failure (2026-07-31, "it keeps saying something is
+wrong"): the impossible-top-speed check judged the entered top speed against
+the ceiling at the app's *own recommendation*, but Boston sets his own final
+drive — so any setting longer than the rec made his real top speed
+"impossible" on every build. `fdset` ("Final drive you run") now exists and
+wins outright over the fit-derived recommendation; the pair (fdset, vmax) is
+read at one setting and everything — gear speeds, verdict, ratio set, the
+disagree check — is computed at it. Do not reintroduce any check that compares
+a user measurement against a setting the user is not running.
 
 ### Inputs that were removed, and one that looks redundant but isn't
 

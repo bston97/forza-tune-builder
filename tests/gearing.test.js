@@ -32,7 +32,7 @@ const near = (a, b, tol) => Math.abs(a - b) <= tol;
 
 const GR86 = { name: 'GR86', cls: 'A', disc: 'road', wt: 2900, fw: 53, hp: 350, tq: 260,
   dt: 'RWD', gr: 7, tire: 'sport', aero: 'both', twf: 0, twr: 0, susp: 'race', arb: 'both',
-  trans: 'race', diff: 'race', vmax: NaN, fdfit: NaN };
+  trans: 'race', diff: 'race', vmax: NaN, fdfit: NaN, vgraph: NaN, fdset: NaN };
 const at = o => X.compute(Object.assign({}, GR86, o));
 const HTML = require('fs').readFileSync(require('path').join(__dirname, '..', 'index.html'), 'utf8');
 const set = (id, v) => { document.getElementById(id).value = v; };
@@ -128,7 +128,7 @@ console.log('--- each of the three inputs does a distinct job ---');
      /Or set these ratios/.test(draw({ fdfit: '4.58', vgraph: '157', vmax: '141.5' })));
   ok('the form no longer claims it changes nothing',
      !/This changes no tune value/.test(HTML));
-  ok('and says what it actually drives', /drives the ratio set/.test(HTML));
+  ok('and says the pair must be read together', /These two are a <b>pair<\/b>/.test(HTML));
 
   ok('the fit alone gives nothing', at({ fdfit: 4.575 }).gearTop === null);
   ok('graph max alone gives nothing', at({ vgraph: 157 }).gearTop === null);
@@ -205,10 +205,10 @@ ok('exposes a ceiling', near(r.topCeil, 159, 1), r.topCeil.toFixed(1));
 ok('a top speed under the ceiling is normal, not an error',
    !/does not add up/.test(at({ fdfit: 4.575, vgraph: 159, vmax: 140 }).w.join(' ')));
 ok('a top speed above the ceiling is impossible and flagged',
-   /Something does not add up in the gearing inputs/.test(
+   /Top speed and final drive disagree/.test(
      at({ fdfit: 4.575, vgraph: 159, vmax: 200 }).w.join(' ')));
 ok('the flag names the likely cause',
-   /read at a <em>different<\/em> final drive than this one/.test(
+   /read as a pair, at the same setting/.test(
      at({ fdfit: 4.575, vgraph: 159, vmax: 200 }).w.join(' ')));
 ok('no axis maximum means no ceiling to check',
    !/does not add up/.test(at({ fdfit: 4.575, vmax: 300 }).w.join(' ')));
@@ -228,7 +228,7 @@ ok('opens with the number to set', /<b>Set 4\.58<\/b>/.test(full));
    what the input actually buys (the gear list). */
 ok('does not fake a calculation at vFrac 1.00', !/&divide; 1\.00/.test(full));
 ok('says the fit is the setting', /your fit unchanged/.test(full));
-ok('says you can set your own final drive', /Or set your own and the table below follows it/.test(full));
+ok('says you can set your own final drive', /enter your own under <b>Final drive you run<\/b>/.test(full));
 ok('a discipline that does scale still shows the working',
    /4\.58 &divide; 0\.76/.test(draw({ disc: 'touge', fdfit: '4.58', vgraph: '157', vmax: '' })));
 ok('offers the sweep band', /sweep <b>3\.\d\d&ndash;4\.\d\d<\/b>/.test(full),
@@ -280,7 +280,7 @@ console.log('--- an impossible top speed is refused, not absorbed ---');
     susp: 'rally', diff: 'rally', fdfit: 2.86, vgraph: 164, vmax: 149 }));
   ok('spots the impossible reading', bogus.topBogus === true);
   ok('refuses to name a gear it tops out in', bogus.topsIn === null, bogus.topsIn);
-  ok('still warns', /Something does not add up/.test(bogus.w.join(' ')));
+  ok('still warns', /Top speed and final drive disagree/.test(bogus.w.join(' ')));
   const page = draw({ disc: 'rally', dt: 'AWD', tire: 'rally', susp: 'rally', diff: 'rally',
     fdfit: '2.86', vgraph: '164', vmax: '149' });
   ok('gear list shows the real limiter, not the impossible figure',
@@ -329,6 +329,36 @@ console.log('--- your final drive, my ratios ---');
   ok('no ratio set without a top speed to aim at',
      !/Or set these ratios/.test(draw({ fdfit: '4.58', vgraph: '157', vmax: '' })));
 }
+
+console.log('--- your final drive is an input, and the pair is judged at it ---');
+/* The failure Boston hit on every build: he sets his own final drive, reads
+   top speed there, enters it — and the app judged that top speed against the
+   ceiling at its OWN recommendation. Run anything longer than the rec and
+   your real top speed becomes "impossible", on correct inputs, every time. */
+{
+  // fd 3.60 with k=589: ceiling = 589/(3.60*0.82) ≈ 199. A 160 mph read there is fine.
+  const mine = at({ fdfit: 4.575, vgraph: 157, fdset: 3.60, vmax: 165 });
+  ok('the entered final drive wins', mine.fdSrc === 'user' && near(mine.v.fd, 3.60, 0.01), mine.v.fd);
+  ok('no false alarm on a correct pair', !/disagree/.test(mine.w.join(' ')), mine.w.join(' ').slice(0, 60));
+  ok('verdict computed at HIS setting', mine.topsIn === 6, mine.topsIn);
+  /* the same top speed without fdset reproduces the old failure — judged
+     against the road rec of 4.58, whose ceiling is 157 */
+  const old = at({ fdfit: 4.575, vgraph: 157, vmax: 165 });
+  ok('without the field, the same inputs still mislead', /disagree/.test(old.w.join(' ')));
+  // a pair that genuinely disagrees is still caught at the user's setting
+  const bad = at({ fdfit: 4.575, vgraph: 157, fdset: 4.60, vmax: 175 });
+  ok('a genuinely impossible pair is still flagged', /disagree/.test(bad.w.join(' ')));
+  ok('user fd needs no fit to be respected',
+     at({ fdset: 3.85 }).fdSrc === 'user' && near(at({ fdset: 3.85 }).v.fd, 3.85, 0.01));
+  ok('and does not get nagged as a guess', !/is a guess, not a tune/.test(at({ fdset: 3.85 }).w.join(' ')));
+  const page = draw({ fdfit: '4.58', vgraph: '157', fdset: '3.60', vmax: '160' });
+  ok('card says the setting is his', /<b>Your final drive: 3\.60\.<\/b>/.test(page));
+  ok('ratio set offered at his setting', /Or set these ratios and keep your own final drive/.test(page));
+}
+
+console.log('--- tire width runs stock to +3 ---');
+ok('no +4 option anywhere', !/value="4">(Front|Rear)/.test(HTML));
+ok('+3 is the ceiling', /Front: \+3/.test(HTML) && /Rear: \+3/.test(HTML));
 
 console.log('--- discredited claims stay dead ---');
 ok('no power curve on the graph',
