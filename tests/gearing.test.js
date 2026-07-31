@@ -132,63 +132,21 @@ ok('speeds fall in gear order', r.gearTop.every((v, n) => n === 0 || v > r.gearT
 ok('drag reaches furthest past the axis',
    at({ disc: 'drag', tire: 'dragt', fdfit: 4.575, vgraph: 159 }).gearTop[6] > r.gearTop[6]);
 
-console.log('--- gears that never engage are called out as wasted PI ---');
-/* Observed at final drive 4.02: 6th redlines at 154 against a 157 chart, so
-   7th's line starts inside the chart and shows as a ~3 mph stub rather than
-   disappearing. Whether the top gear is visible depends on where the gear
-   BELOW it runs out — an earlier wording implied it vanishes outright and sent
-   Boston looking for the wrong thing. */
-r = at({ fdfit: 4.575, vgraph: 157, vmax: 143.5 });
-ok('predicts the stub instead of claiming it vanishes',
-   /short stub of it in the top-right corner/.test(r.w.join(' ')));
-ok('sizes the stub', /about 3 mph of line before the edge/.test(r.w.join(' ')),
-   (r.w.join(' ').match(/about \d+ mph of line/) || [])[0]);
-ok('says a stub is not a usable gear', /the shift point drawn, not a gear you use/.test(r.w.join(' ')));
-ok('card explains stub vs vanished', /still climbing<\/em> as it reaches the edge/.test(
-   (() => { const s = (id, v) => { document.getElementById(id).value = v; };
-     Object.keys(GR86).forEach(k => s(k, typeof GR86[k] === 'number' && isNaN(GR86[k]) ? '' : GR86[k]));
-     s('fdfit', '4.575'); s('vgraph', '157'); els['calc'].onclick();
-     const h = els['out'].innerHTML; s('vgraph', ''); return h; })()));
-/* A gear earns its place by being REACHED, not by fitting the chart. You shift
-   into gear N where gear N-1 runs out, so the test is that speed against top
-   speed — independent of whether the line fits on the axis. The two conditions
-   are orthogonal: a gear can hang off the edge and still be used, or sit well
-   inside the chart and never be touched. */
-r = at({ fdfit: 4.575, vgraph: 157, vmax: 143.5 });
-ok('flags the gear that is never entered', /Top gear never engages/.test(r.w.join(' ')));
-ok('names the shift-in speed, not the redline', /shift into 7th at 154 mph/.test(r.w.join(' ')),
-   (r.w.join(' ').match(/shift into \w+ at \d+ mph/) || [])[0]);
-ok('says running off the chart is not itself the problem',
-   /Running off the chart is not the problem/.test(r.w.join(' ')));
-ok('names the shorter box that would do', /A 6-speed does the same job for less PI/.test(r.w.join(' ')));
-ok('quotes the measured figure', /only reaches 144 mph/.test(r.w.join(' ')));
-ok('a measured top speed above the shift point clears the gear',
-   !/never engages/.test(at({ fdfit: 4.575, vgraph: 157, vmax: 156 }).w.join(' ')));
-
-/* i.vmax has to be top speed at the RECOMMENDED final drive, not at the fit:
-   gearTop is computed at that setting and top speed moves with the gearing, so
-   a reading from any other setting is not comparable. Hence the second pass —
-   calculate, apply, read, re-enter — and hence the "different final drive"
-   wording when the two cannot both be true.
-
-   Without a measured top speed the axis is the only comparison available, and
-   it sits well above anything the car reaches — 13 mph above on the GR86. So a
-   shift point just under the axis proves nothing, and the app says so rather
-   than guessing in either direction. */
-const noTop = at({ fdfit: 4.575, vgraph: 157 }).w.join(' ');
-ok('admits it cannot tell without top speed', /Cannot tell whether your top gear does anything/.test(noTop));
-ok('explains why the axis will not do', /the end of the graph is not a speed the car reaches/.test(noTop));
-ok('asks for the one number that settles it', /put it in <b>Top speed at that setting<\/b>/.test(noTop));
-ok('does not condemn the gear on a guess', !/never engages/.test(noTop));
-ok('counts more than one when more than one is dead',
-   /Top 3 gears never engage/.test(
-     at({ disc: 'drag', tire: 'dragt', fdfit: 6.2, vgraph: 159, vmax: 120 }).w.join(' ')),
-   (at({ disc: 'drag', tire: 'dragt', fdfit: 6.2, vgraph: 159, vmax: 120 }).w.join(' ')
-      .match(/Top \d+ gears never engage/) || [])[0]);
-ok('no axis maximum means no claim about dead gears',
-   !/never engage/.test(at({ fdfit: 4.575 }).w.join(' ')));
-ok('no axis maximum means no speeds, not wrong speeds', at({ fdfit: 4.575 }).gearTop === null);
-ok('no fit means no speeds', at({ vgraph: 159 }).gearTop === null);
+console.log('--- a gear earns its place by being reached, not by fitting the chart ---');
+/* You shift into gear N where gear N-1 runs out, so the test is that speed
+   against top speed — independent of whether the line fits on the axis. The
+   verdict belongs beside the ratio it is about, not in five sentences of red
+   above it: the warning strip is for things that are wrong, and a gear you
+   cannot reach is just a fact about the build. */
+r = at({ fdfit: 4.575, vgraph: 157, vmax: 141.5 });
+ok('knows which gear the car runs out in', r.topsIn === 6, r.topsIn);
+ok('no red warning for it', !r.w.join(' ').includes('never engage'));
+ok('drag, geared long, runs out lower down',
+   at({ disc: 'drag', tire: 'dragt', fdfit: 4.575, vgraph: 157, vmax: 141.5 }).topsIn <= 6);
+ok('a car that reaches everything tops out in top gear',
+   at({ fdfit: 4.575, vgraph: 157, vmax: 200 }).topsIn === 7);
+ok('no top speed means no verdict', at({ fdfit: 4.575, vgraph: 157 }).topsIn === null);
+ok('no axis maximum means no verdict either', at({ fdfit: 4.575, vmax: 141.5 }).topsIn === null);
 
 console.log('--- top gear\'s limiter is a ceiling, not a predicted top speed ---');
 /* Measured 2026-07-31 at final drive 4.82: top gear redlined at 148 mph and
@@ -202,64 +160,71 @@ ok('a top speed above the ceiling is impossible and flagged',
    /Something does not add up in the gearing inputs/.test(
      at({ fdfit: 4.575, vgraph: 159, vmax: 200 }).w.join(' ')));
 ok('the flag names the likely cause',
-   /read at a <em>different<\/em> final drive than this one/.test(at({ fdfit: 4.575, vgraph: 159, vmax: 200 }).w.join(' ')));
+   /read at a <em>different<\/em> final drive than this one/.test(
+     at({ fdfit: 4.575, vgraph: 159, vmax: 200 }).w.join(' ')));
 ok('no axis maximum means no ceiling to check',
    !/does not add up/.test(at({ fdfit: 4.575, vmax: 300 }).w.join(' ')));
 
-console.log('--- the graph is described as it actually behaves ---');
+console.log('--- the card leads with the setting, not an essay ---');
+/* What shipped before this: a 179 mph figure beside 7th on a car doing 141,
+   under 450 words of prose arguing with itself. The number is what gets read. */
 const set = (id, v) => { document.getElementById(id).value = v; };
-Object.keys(GR86).forEach(k => set(k, typeof GR86[k] === 'number' && isNaN(GR86[k]) ? '' : GR86[k]));
-set('fdfit', '4.72'); set('vgraph', '');
-els['calc'].onclick();
-const page = els['out'].innerHTML;
-ok('gear list shows speeds when the axis maximum is known', !/to \d+ mph/.test(page));
-set('vgraph', '159'); set('fdfit', '4.575'); els['calc'].onclick();
-const withMph = els['out'].innerHTML;
-ok('speeds appear beside the ratios', /to 181 mph/.test(withMph),
-   (withMph.match(/to \d+ mph/g) || []).join(' '));
-ok('all seven gears annotated', (withMph.match(/to \d+ mph/g) || []).length === 7);
-ok('card calls the ceiling a ceiling', /do not read that as top speed/.test(withMph));
-ok('card cites the measured counter-example', /redlined at 148 and the car did 140/.test(withMph));
-ok('card hands the decision to the Performance panel',
-   /Performance panel decides this, not the graph/.test(withMph));
-ok('card explains the extra-shift cost', /forces an extra shift before 100 mph/.test(withMph));
-ok('card calls the final drive a starting point',
-   /a place to start rather than an answer to two decimals/.test(withMph));
-ok('card flags the gear that never engages', /Check which gear it tops out in/.test(withMph));
-els['save'].onclick();
-ok('sheet carries the speeds too', /class="gear-mph">181</.test(blob.parts[0]));
-set('vgraph', ''); set('fdfit', '4.72'); els['calc'].onclick();
-/* The engine's power curve is a real thing and gets mentioned; what must never
-   come back is the claim that one is drawn on this graph and can be lined up. */
-ok('does not put a power curve on the graph',
-   !/power curve (just )?reach|line up the power curve|power curve[^.]{0,40}edge of the/i.test(page));
-ok('says the axis does NOT rescale', /bottom axis does not rescale/.test(page));
-ok('explains that tall gears run off the end', /runs off the right-hand end/.test(page));
-ok('says the edge is the reference, not the answer',
-   /is the <em>reference point<\/em>, not the answer/.test(page));
-ok('drops the touch-the-limiter advice a long-geared car cannot follow',
-   !/should just touch the limiter in top gear/.test(page));
-ok('does not claim the last gear always touches the edge',
-   !/last gear always touches/.test(page) && !/axis rescales as you move/.test(page));
-ok('shows the working', /4\.72 &divide; 1\.14/.test(page));
-ok('says it gears longer than the fit, not shorter', /14% <b>longer<\/b> than that/.test(page));
-ok('explains why past the edge is fine', /the car cannot reach the edge anyway/.test(page));
-ok('offers a band rather than one number', /Sweep 3\.\d\d&ndash;4\.\d\d/.test(page),
-   (page.match(/Sweep [\d.]+&ndash;[\d.]+/) || [])[0]);
+const draw = o => {
+  Object.keys(GR86).forEach(k => set(k, typeof GR86[k] === 'number' && isNaN(GR86[k]) ? '' : GR86[k]));
+  Object.keys(o).forEach(k => set(k, o[k]));
+  els['calc'].onclick();
+  return els['out'].innerHTML;
+};
+const gearBlock = h => (h.match(/<div class="gears">[\s\S]*?<\/div><\/div>/) || [''])[0];
+const words = h => { const g = h.indexOf('>Gearing</h3>'), n = h.indexOf('<div class="sec"', g);
+  return h.slice(g, n).replace(/<[^>]+>/g, ' ').split(/\s+/).filter(Boolean).length; };
+
+const full = draw({ fdfit: '4.58', vgraph: '157', vmax: '141.5' });
+ok('opens with the number to set', /<b>Set 4\.02<\/b>/.test(full));
+ok('shows the working', /4\.58 &divide; 1\.14/.test(full));
+ok('offers the sweep band', /sweep <b>3\.\d\d&ndash;4\.\d\d<\/b>/.test(full),
+   (full.match(/sweep <b>[\d.]+&ndash;[\d.]+<\/b>/) || [])[0]);
+ok('hands the decision to the Performance panel', /let the Performance panel decide/.test(full));
+ok('marks where the car runs out', /tops out here, 142 mph/.test(gearBlock(full)));
+ok('marks the gear that never comes in', /never used/.test(gearBlock(full)));
+ok('does NOT print a speed the car cannot reach', !/179 mph/.test(gearBlock(full)),
+   gearBlock(full).replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim());
+ok('names the last usable gear', /<b>6th is your last usable gear\.<\/b>/.test(full));
+ok('points at the shorter box once, quietly', /a 6-speed would drive the same/.test(full));
+ok('the whole section stays short', words(full) < 160, words(full) + ' words');
+
+const noTop = draw({ fdfit: '4.58', vgraph: '157', vmax: '' });
+ok('without top speed it still lists limiter speeds', /to 179 mph/.test(gearBlock(noTop)));
+ok('and asks for the one number that would sharpen it',
+   /Add <b>Top speed at that setting<\/b>/.test(noTop));
+ok('but claims nothing about which gears are used',
+   !/never used|last usable gear/.test(noTop));
+
+const guess = draw({ fdfit: '', vgraph: '', vmax: '' });
+ok('an unsolved final drive still shouts', /is a guess, not a tune/.test(guess));
+ok('and the gear list carries no invented speeds', !/mph/.test(gearBlock(guess)));
+
+console.log('--- discredited claims stay dead ---');
+ok('no power curve on the graph',
+   !/power curve (just )?reach|line up the power curve|power curve[^.]{0,40}edge of the/i.test(full));
+ok('no claim the axis rescales', !/axis rescales as you move/.test(full));
+ok('no claim the last gear always touches the edge', !/last gear always touches/.test(full));
+ok('no touch-the-limiter advice a long-geared car cannot follow',
+   !/should just touch the limiter in top gear/.test(full));
+// re-render the solved build first — the sheet exports whatever was last calculated
+draw({ fdfit: '4.58', vgraph: '157', vmax: '141.5' });
 els['save'].onclick();
 const sh = blob.parts[0];
-ok('sheet does not invent a power curve', !/power curve/.test(sh));
-ok('sheet says the axis is fixed', /bottom axis does not rescale/.test(sh));
 ok('sheet says it was solved off the graph', /solved off the graph/.test(sh));
+ok('sheet does not invent a power curve', !/power curve/.test(sh));
 ok('sheet clean', !/undefined|NaN|\{\{/.test(sh));
 
 console.log('--- the fit survives a round trip ---');
-els['save'].onclick();
 els['lib'].onclick();
 const key = encodeURIComponent(JSON.parse(localStorage.getItem('fh6lib'))[0].k);
 set('fdfit', '');
 els['out'].fire('click', { target: { dataset: { load: key } } });
-ok('fit comes back on Load', String(els['fdfit'].value) === '4.72', els['fdfit'].value);
+ok('fit comes back on Load', String(els['fdfit'].value) === '4.58', els['fdfit'].value);
 els['newcar'].onclick();
 ok('New car clears it', els['fdfit'].value === '');
 
