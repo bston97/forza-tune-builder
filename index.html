@@ -421,22 +421,36 @@ const PI_BANDS=[['D',400],['C',500],['B',600],['A',700],['S1',800],['S2',900],['
 const classForPI=pi=>{ const b=PI_BANDS.find(x=>pi<=x[1]); return b?b[0]:'X'; };
 
 /* aF/aR are multipliers on the axle-load-proportional ARB base (1.0 = neutral
-   for that axle's share of the weight). <1 front + >1 rear = rotation trim. */
+   for that axle's share of the weight). <1 front + >1 rear = rotation trim.
+
+   vFrac: final drive = fdFit / vFrac, where fdFit is the setting that puts top
+   gear on the right edge of the speed graph. ABOVE 1.0 means gearing LONGER
+   than that fit — top gear redlining past the edge, which is fine because the
+   car cannot reach the edge anyway.
+
+   Road was measured 2026-07-31 by sweeping the final drive on a 2022 GR86 and
+   reading the Performance panel at each stop (see CLAUDE.md for the table).
+   The optimum landed at 4.00 against a 4.575 fit, so 4.575/4.00 = 1.14. The
+   previous 0.95 was guessed, and guessed in the wrong direction — it pushed
+   toward 4.82, which measured worst of the six settings tried.
+
+   The other six are that measurement scaled by 1.2, preserving the relative
+   ordering that was already here. Only road is measured. */
 const DISC={
  road  :{n:'Road / Circuit', fF:1.00,fR:0.97, zF:.62,zR:.62, aF:0.93,aR:1.05,
-         camF:-2.2,camR:-1.3, toeF:0.0,toeR:-0.1, cast:6.7, rhF:0,rhR:0, fd:3.70, vFrac:0.95, dec:15, aeF:60},
+         camF:-2.2,camR:-1.3, toeF:0.0,toeR:-0.1, cast:6.7, rhF:0,rhR:0, fd:3.70, vFrac:1.14, dec:15, aeF:60},
  sprint:{n:'Sprint / Speed Race', fF:0.98,fR:0.95, zF:.60,zR:.60, aF:0.95,aR:1.02,
-         camF:-2.0,camR:-1.2, toeF:0.0,toeR:-0.1, cast:6.7, rhF:0,rhR:0, fd:3.55, vFrac:0.97, dec:12, aeF:55},
+         camF:-2.0,camR:-1.2, toeF:0.0,toeR:-0.1, cast:6.7, rhF:0,rhR:0, fd:3.55, vFrac:1.17, dec:12, aeF:55},
  touge :{n:'Touge', fF:0.94,fR:0.90, zF:.58,zR:.58, aF:0.88,aR:1.10,
-         camF:-2.4,camR:-1.4, toeF:0.1,toeR:-0.1, cast:6.7, rhF:10,rhR:15, fd:4.20, vFrac:0.72, dec:10, aeF:65},
+         camF:-2.4,camR:-1.4, toeF:0.1,toeR:-0.1, cast:6.7, rhF:10,rhR:15, fd:4.20, vFrac:0.87, dec:10, aeF:65},
  drift :{n:'Drift', fF:0.88,fR:1.12, zF:.55,zR:.65, aF:0.60,aR:1.35,
-         camF:-2.8,camR:-1.0, toeF:0.3,toeR:0.1, cast:7.0, rhF:5,rhR:15, fd:3.50, vFrac:0.90, dec:5, aeF:50},
+         camF:-2.8,camR:-1.0, toeF:0.3,toeR:0.1, cast:7.0, rhF:5,rhR:15, fd:3.50, vFrac:1.08, dec:5, aeF:50},
  drag  :{n:'Drag', fF:1.10,fR:0.88, zF:.60,zR:.50, aF:1.00,aR:0.70,
-         camF:-0.5,camR:-0.2, toeF:0.0,toeR:0.0, cast:5.0, rhF:0,rhR:5, fd:3.30, vFrac:1.00, dec:0, aeF:0},
+         camF:-0.5,camR:-0.2, toeF:0.0,toeR:0.0, cast:5.0, rhF:0,rhR:5, fd:3.30, vFrac:1.20, dec:0, aeF:0},
  rally :{n:'Dirt Rally', fF:0.62,fR:0.60, zF:.68,zR:.68, aF:0.22,aR:0.24,
-         camF:-1.2,camR:-0.8, toeF:0.1,toeR:-0.2, cast:6.0, rhF:75,rhR:75, fd:4.40, vFrac:0.75, dec:12, aeF:50},
+         camF:-1.2,camR:-0.8, toeF:0.1,toeR:-0.2, cast:6.0, rhF:75,rhR:75, fd:4.40, vFrac:0.90, dec:12, aeF:50},
  cc    :{n:'Cross-Country', fF:0.52,fR:0.50, zF:.70,zR:.70, aF:0.15,aR:0.16,
-         camF:-0.8,camR:-0.5, toeF:0.0,toeR:-0.2, cast:6.0, rhF:100,rhR:100, fd:4.80, vFrac:0.70, dec:15, aeF:50}
+         camF:-0.8,camR:-0.5, toeF:0.0,toeR:-0.2, cast:6.0, rhF:100,rhR:100, fd:4.80, vFrac:0.84, dec:15, aeF:50}
 };
 
 const PSI={stock:27,street:27,sport:27.5,semi:31,slick:31.5,rally:25,offroad:24,dragt:28};
@@ -1002,6 +1016,13 @@ function compute(i){
      Performance panel on that same screen reports 0-60, 0-100 and top speed
      for whatever is set, and those are the numbers being optimised. */
   const topCeil=gearTop ? gearTop[i.gr-1] : null;
+  /* The sweep that calibrated vFrac also showed how flat this is: across
+     3.50-4.82 on the GR86, 0-100 moved 0.12s and top speed 4.4 mph, with four
+     of the six settings inside 1% of each other. Quoting one number to two
+     decimals implies a precision the game does not reward, so the card offers
+     the band the measurement actually supports and hands the pick to the
+     Performance panel. */
+  const fdBand=fdSrc==='fit' ? [snap('fd',fd*0.93),snap('fd',fd*1.14)] : null;
   /* A measured top speed at or under that ceiling is ordinary — the car is
      power-limited before the limiter, which is normal. Above it is impossible
      and means an input is wrong. */
@@ -1009,8 +1030,19 @@ function compute(i){
     w.push('<b>Something does not add up in the gearing inputs.</b> Top gear meets the limiter at '+
       Math.round(topCeil)+' mph here, so the car cannot do the '+Math.round(i.vmax)+
       ' you entered &mdash; nothing goes faster than its own rev limiter. Most likely the fit and the top speed were read at different final drives, or the fit is not where top gear actually touched the edge.');
-  if(fdSrc==='fit'&&fd>i.fdfit*1.001&&i.gr>=7)
-    w.push('<b>Worth counting your gears.</b> If the top one or two were running off the end of the speed graph before this, they were never doing anything &mdash; that is PI spent on ratios the car cannot reach. A '+(i.gr-1)+'-speed geared properly beats a '+i.gr+'-speed with a dead gear on top.');
+  /* A gear whose limiter sits past the end of the speed graph is one the car
+     will not reach, so it is PI spent on a ratio that never engages. Measured
+     on the GR86: at every final drive worth running it topped out in 6th, and
+     the seventh ratio did nothing at any setting. */
+  if(gearTop&&i.gr>=6){
+    const dead=gearTop.filter(s=>s>i.vgraph).length;
+    if(dead>0)
+      w.push('<b>Top '+(dead>1?dead+' gears look':'gear looks')+' like wasted PI.</b> '+
+        (dead>1?'They redline':'It redlines')+' past '+Math.round(i.vgraph)+
+        ' mph &mdash; off the end of the speed graph &mdash; so the car tops out before '+
+        (dead>1?'they':'it')+' ever engage'+(dead>1?'':'s')+'. Confirm which gear it actually tops out in on the Performance panel; if the last one never comes in, a '+
+        (i.gr-dead)+'-speed does the same job for less PI. On the reference GR86 the 7th ratio was dead at every setting worth running.');
+  }
   if(i.disc==='rally'&&!['rally','offroad'].includes(i.tire)) w.push('<b>Tires:</b> Rally tires are non-negotiable on dirt &mdash; slicks lose more to grip than they save in PI.');
   if(i.disc==='cc'&&i.tire!=='offroad') w.push('<b>Tires:</b> Cross-country needs off-road tires, max width.');
   if(['rally','cc'].includes(i.disc)&&i.dt!=='AWD') w.push('<b>Drivetrain:</b> AWD is effectively mandatory for '+DISC[i.disc].n+'.');
@@ -1068,7 +1100,7 @@ function compute(i){
   const v={};
   for(const k in raw) v[k]= raw[k]==null ? null : snap(k,raw[k]);
 
-  return {i,d,PI,f,w,v,fdSrc,gearTop,topCeil,gears:SPREAD[i.gr]};
+  return {i,d,PI,f,w,v,fdSrc,gearTop,topCeil,fdBand,gears:SPREAD[i.gr]};
 }
 
 /* ===================== ADJUSTMENT ENGINE ===================== */
@@ -1132,28 +1164,35 @@ function render(){
       ? 'Front runs near the 55 psi cap &mdash; a hard skinny front tire cuts rolling resistance and nothing up front needs grip. Rear stays soft (~15) to maximize the contact patch on launch. If the rear spins through 1st&ndash;2nd, drop another 0.5.'
       : '<b>Verify in-game:</b> warm target 32&ndash;34 psi on the tire-temp telemetry screen. Red/overheating &rarr; raise 0.5. Staying blue &rarr; lower 0.5.'));
 
+  /* Built up front: the branch table below is an object literal, so every arm
+     is evaluated whatever fdSrc says, and a null band would throw in the arm
+     that never gets used. */
+  const band=r.fdBand ? fmt('fd',r.fdBand[0])+'&ndash;'+fmt('fd',r.fdBand[1]) : '';
   R.push(sec('var(--gear)','Gearing',[['Final Drive',vin('fd')]],
     (i.trans==='stock'
       ? '<b>No final drive slider on a stock gearbox</b> &mdash; fit at least a Sport transmission before any of this can be entered. The figure below is what to set once you have.<br><br>'
       : '')+
     ({fit:'<b>Starting point, off the graph.</b> '+fmt('fd',r.i.fdfit)+' &divide; '+r.d.vFrac.toFixed(2)+
-        ' &mdash; the setting where top gear just fills the chart, shortened to '+Math.round(r.d.vFrac*100)+
-        '% of that for '+d.n+'. The gear speeds below are exact; <b>this final drive is a sensible place to start a sweep, not a final answer</b>, because how much shortening pays depends on the engine\'s power curve and the game will not show you that. Check it against the Performance panel before you keep it.'+
-        (r.d.vFrac<1
-          ? ' The last line will stop '+Math.round((1-r.d.vFrac)*100)+'% short of the right edge rather than on it &mdash; that is deliberate, not a miss.'
-          : ' Top gear runs out right at the edge, which is the reference point itself.'),
+        ' &mdash; the setting that puts top gear on the right edge, geared '+
+        (r.d.vFrac>1?Math.round((r.d.vFrac-1)*100)+'% <b>longer</b> than that':Math.round((1-r.d.vFrac)*100)+'% shorter than that')+
+        ' for '+d.n+'.'+
+        (r.d.vFrac>1?' Top gear will now redline past the right-hand edge of the chart, which is fine &mdash; the car cannot reach the edge anyway, so gearing to it throws away the whole top of the box.':'')+
+        ' <b>Sweep '+band+' and let the Performance panel pick.</b> Measured on a GR86, everything across that band landed within 1% of each other, so this number is a place to start rather than an answer to two decimals.',
       tire:'<b>Solved from redline, tire size and top speed</b> &mdash; rpm &times; circumference &divide; (speed &times; top gear). Close, but it trusts the tire you typed and the top speed reading. Sweeping the final drive until top gear just fits the graph is exact instead, and faster.',
       rough:'<b>Rough estimate from power-to-weight &mdash; do not type this in and drive off.</b> It knows nothing about your tires, gear count or ratios. Sweep the final drive until top gear\'s line just reaches the right edge of the graph, put that setting in the Gearing box on the left, and calculate again.'
      })[r.fdSrc]+
-    '<br><br><b>How to read that graph:</b> one straight line per gear, rpm up the side, mph along the bottom, each line ending where that gear meets the limiter. <b>The bottom axis does not rescale</b> &mdash; its range is fixed by the car, so a gear geared taller than the chart runs off the right-hand end and is simply not drawn. A top gear you cannot see is a gear the car can never use, and one you can barely see is nearly that. Sweep the final drive until that last line lands on the edge: that is the whole reading, and it needs no numbers off the screen at all.'+
-    ' Confirm on track: the car should just touch the limiter in top gear at the end of the longest straight. Bouncing off it early &rarr; lower final drive. Weak corner exit &rarr; raise it.<br><br><b>Leave individual gear ratios at the race-transmission default</b> (shown for reference &mdash; these are the game\'s own values). Final drive scales all gears together &mdash; do not respace them.',
+    '<br><br><b>How to read that graph:</b> one straight line per gear, rpm up the side, mph along the bottom, each line ending where that gear meets the limiter. <b>The bottom axis does not rescale</b> &mdash; its range is fixed by the car, so a gear taller than the chart runs off the right-hand end and is not drawn. Finding where the last line lands on that edge is the <em>reference point</em>, not the answer: the car cannot reach the edge, so the setting worth running is longer than that and the top gear disappears off the end on purpose.'+
+    '<br><br>Confirm on track by feel rather than by the limiter &mdash; on a car geared this way you may never see it. Weak drive out of corners &rarr; raise the final drive. Running out of gear down the longest straight &rarr; lower it. <b>Leave individual gear ratios at the race-transmission default</b> (shown for reference &mdash; these are the game\'s own values). Final drive scales all gears together &mdash; do not respace them.',
     '<div class="gears">'+r.gears.map((g,n)=>'<div class="g"><span>'+(n+1)+(n===0?'st':n===1?'nd':n===2?'rd':'th')+'</span><span>'+g.toFixed(2)+
       (r.gearTop?' <span style="color:var(--dim)">&middot; to '+Math.round(r.gearTop[n])+' mph</span>':'')+
       '</span></div>').join('')+'</div>'+
     (r.gearTop
       ? '<div class="note" style="margin-top:8px">Speeds are where each gear meets the limiter at this final drive, worked from your fit and the '+Math.round(r.i.vgraph)+' mph axis. Verified against the graph to about 1%, so use them to see where your shifts land &mdash; note which gear you are in at the speeds that matter on your circuit.'+
         '<br><br><b>Top gear runs out at '+Math.round(r.topCeil)+' mph, but do not read that as top speed.</b> It is a ceiling, not a promise &mdash; the car only gets there if it still makes power that high in the rev range, and often it does not. Measured on a GR86: top gear redlined at 148 and the car did 140.'+
-        '<br><br><b>The Performance panel decides this, not the graph.</b> On the left of that screen the game reports 0&ndash;60, 0&ndash;100 and Top Speed for whatever you have set. Sweep the final drive a few steps either side of this number and read all three: shorter helps 0&ndash;60 and costs top speed, and it starts costing 0&ndash;100 as soon as it forces an extra shift before 100 mph. Take the setting that wins on whichever of those '+r.d.n+' actually rewards.</div>'
+        '<br><br><b>The Performance panel decides this, not the graph.</b> On the left of that screen the game reports 0&ndash;60, 0&ndash;100 and Top Speed for whatever you have set. Sweep '+band+' and read all three at each stop: shorter helps 0&ndash;60 and costs top speed, and it starts costing 0&ndash;100 the moment it forces an extra shift before 100 mph. Take whichever wins on what '+r.d.n+' actually rewards.'+
+        (r.gearTop.filter(s=>s>r.topCeil*0.999).length<r.i.gr&&r.i.gr>=6
+          ? '<br><br><b>Check which gear it tops out in while you are there.</b> On the GR86 every good setting topped out in 6th &mdash; 7th was never used at any final drive worth running, so the seventh ratio was PI spent on nothing. If your top gear never comes in, a shorter gearbox is free performance-per-PI.'
+          : '')+'</div>'
       : '')));
 
   const noAlign=locked('camF','camR','toeF','toeR','cast');
@@ -1963,9 +2002,10 @@ function sheet(){
     (i.trans==='stock'?'no final drive slider exists on a stock gearbox &mdash; fit at least a Sport transmission, then set '+fmt('fd',eff('fd'))+'. ':fmt('fd',eff('fd'))+
       (r.fdSrc==='fit'?' is solved off the graph, so it is exact for this car. ':
        r.fdSrc==='tire'?' is solved from redline and tire size. ':' is a rough placeholder from power-to-weight &mdash; verify it on the graph before trusting it. '))+
-    'On the Gearing tab the graph is one straight line per gear, rpm up the side and mph along the bottom. <strong>Its bottom axis does not rescale</strong> &mdash; the range is fixed by the car, so any gear taller than the chart runs off the right-hand end and is not drawn at all. Sweep the final drive until the top gear\'s line lands on that edge; a top gear you cannot see is one the car can never use. '+
-    (d.vFrac<1?'This setting sits '+Math.round((1-d.vFrac)*100)+'% shorter than that fit, so the last line stops just short of the edge &mdash; deliberate, for '+d.n+'. ':'')+
-    'Confirm on track: the car should just touch the limiter in top gear at the end of the longest straight. <strong>Bouncing off the limiter early</strong> = lower the final drive (taller gears, more top speed). <strong>Weak exit acceleration</strong> = raise it (shorter gears, more acceleration). Individual gears stay as listed &mdash; only the final drive needs adjusting.</p>');
+    'On the Gearing tab the graph is one straight line per gear, rpm up the side and mph along the bottom. <strong>Its bottom axis does not rescale</strong> &mdash; the range is fixed by the car, so any gear taller than the chart runs off the right-hand end and is not drawn. Sweeping until the top gear lands on that edge gives the reference point; the setting here sits '+
+    (d.vFrac>1?Math.round((d.vFrac-1)*100)+'% <strong>longer</strong> than it, with top gear off the end of the chart on purpose &mdash; the car cannot reach that edge, so gearing to it wastes the top of the box.'
+              :Math.round((1-d.vFrac)*100)+'% shorter than it, so the last line stops short of the edge &mdash; deliberate, for '+d.n+'.')+
+    ' Confirm on track: the car should just touch the limiter in top gear at the end of the longest straight. <strong>Bouncing off the limiter early</strong> = lower the final drive (taller gears, more top speed). <strong>Weak exit acceleration</strong> = raise it (shorter gears, more acceleration). Individual gears stay as listed &mdash; only the final drive needs adjusting.</p>');
 
   /* The sheet gets read away from the app, so it has to account for its own
      dashes — otherwise a gated row looks like a bug in the generator. */

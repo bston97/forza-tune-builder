@@ -160,17 +160,40 @@ curve.
 **So geometry picks the starting point and the Performance panel picks the
 setting.** That panel — same screen, left-hand side — reports 0-60, 0-100, Top
 Speed, braking distances and lateral G for whatever is currently set. Those are
-the actual objective. Measured on the GR86:
+the actual objective, they are simulation output rather than driving, and they
+carry no run-to-run variance. Sweeping the final drive against them is how
+`vFrac` finally got measured.
 
-| final drive | 0-60 | 0-100 | top speed |
-|---|---|---|---|
-| 3.73 | 3.072 | **8.619** | **145.4** |
-| 4.82 | **3.023** | 8.723 | 140.0 |
+**The calibration sweep** (GR86, 2026-07-31, ratios held at the race-box
+default, final drive the only variable, fit = 4.575):
 
-Shortening improved 0-60 by 0.05s and cost 0.10s of 0-100 plus 5.4 mph, because
-at 4.82 it takes five gears to reach 100 mph instead of four. One extra shift
-outweighed the ratio gain. **`vFrac` = 0.95 for road is therefore suspect and
-under review** — do not treat those constants as settled.
+| final drive | 0-60 | 0-100 | top speed | tops out in |
+|---|---|---|---|---|
+| 4.82 | **3.040** | 8.723 | 140.0 | 7th |
+| 4.58 | 3.056 | 8.636 | 141.4 | 7th |
+| 4.30 | 3.088 | 8.671 | 142.7 | 6th |
+| 4.00 | 3.104 | **8.601** | 143.5 | 6th |
+| 3.73 | 3.088 | 8.671 | 143.8 | 6th |
+| 3.50 | 3.153 | 8.671 | **144.4** | 5th |
+
+Three things came out of it:
+
+1. **`vFrac` for road is 1.14, not 0.95 — the guess was inverted.** The optimum
+   is 4.00 against a 4.575 fit, so the right move is gearing *longer* than the
+   fit by 14%, with top gear redlining past the end of the chart. That is fine
+   precisely because the car cannot reach the chart edge. The old 0.95 pushed
+   toward 4.82, which measured **worst of the six** — it won 0-60 by 0.016s and
+   lost on both other counts. The other six disciplines are this scaled by 1.2,
+   preserving the relative ordering that was already there; **only road is
+   measured.**
+2. **The surface is flat.** 0.12s across the whole 0-100 range and 4.4 mph of
+   top speed, with four of six settings inside 1%. Quoting a final drive to two
+   decimals implies precision the game does not reward, so `compute()` returns
+   `fdBand` and the card asks for a sweep rather than pretending to an answer.
+3. **The 7th ratio was dead at every setting worth running.** At 4.30 and below
+   the car tops out in 6th; the settings that do reach 7th are the slow ones. A
+   6-speed would have performed identically for less PI, which is a build
+   finding no amount of tuning fixes.
 
 The verified core, which survived all three corrections: per-gear limiter speeds
 from `k/(FD·G)` with `k = axisMax · fdFit · G_top`. Checked against the graph at
