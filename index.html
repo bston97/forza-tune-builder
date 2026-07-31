@@ -77,6 +77,28 @@
   details#extra[open] summary::before{content:'▾ '}
   details#extra summary:hover{color:var(--tx)}
 
+  /* Mode picker — what you're doing, chosen before anything is typed. */
+  .modes{display:grid;grid-template-columns:1fr 1fr 1fr;gap:5px;margin-bottom:8px}
+  .modes button{background:var(--panel2);border:1px solid var(--line);color:var(--dim);
+        padding:9px 4px;border-radius:7px;font-size:12px;font-weight:600;letter-spacing:.2px}
+  .modes button:hover{color:var(--tx);border-color:var(--acc)}
+  .modes button.on{background:var(--acc);border-color:var(--acc);color:#06121f}
+  .modes button:disabled{opacity:.4;cursor:not-allowed}
+  .modes button:disabled:hover{color:var(--dim);border-color:var(--line)}
+
+  /* Pre-flight: everything that lands on the sheet, checked before export. */
+  .pf{display:grid;gap:5px;margin:2px 0 4px}
+  .pf .r{display:grid;grid-template-columns:16px 1fr auto;gap:8px;align-items:baseline;
+        font-size:12.5px;padding:4px 0;border-bottom:1px solid var(--line)}
+  .pf .r:last-child{border-bottom:0}
+  .pf .k{color:var(--dim)}
+  .pf .v{font:600 12.5px ui-monospace,Consolas,monospace;color:#c8d2e4;text-align:right}
+  .pf .ok{color:var(--spring)}
+  .pf .no{color:#ff8787}
+  .pf .warn2{color:var(--mod)}
+  .pf h3{font-size:11px;text-transform:uppercase;letter-spacing:.9px;color:var(--dim);
+        margin:12px 0 2px;font-weight:600}
+
   .btns{display:grid;grid-template-columns:1fr 1fr;gap:9px;margin-top:16px}
   button{border:0;border-radius:7px;padding:11px;font-size:13px;font-weight:600;cursor:pointer;
          font-family:inherit}
@@ -219,6 +241,20 @@
   <div class="cols">
     <!-- ============ INPUT ============ -->
     <div class="panel">
+      <!-- What you are doing comes first, because it decides which of the
+           fields below are worth showing at all. Planning a build happens
+           before any part is bought, so the whole "what's fitted" block and
+           the gearing readings are noise there. -->
+      <div class="modes" id="modes">
+        <button type="button" data-mode="plan">Plan build</button>
+        <button type="button" data-mode="tune" class="on">Calculate tune</button>
+        <button type="button" data-mode="sheet">Tune sheet</button>
+      </div>
+      <div class="hint" id="modehint" style="margin:0 0 4px"></div>
+
+      <div id="preflight" style="display:none"></div>
+
+      <div id="formfields">
 <!-- Grouped by WHERE the numbers come from, in the order you'd hit the screens:
      no screen at all -> one stats panel -> the tuning menu you're about to open anyway. -->
       <h2 style="display:flex;justify-content:space-between;align-items:center">Build target
@@ -270,6 +306,7 @@
       <div class="hint" style="margin-top:6px">PI is the big number on the same panel. Enter it and
         the Build Plan works out how much budget you have left to the class ceiling.</div>
 
+      <div id="fitted">
       <h2 style="margin-top:16px">What's fitted <span class="hint">— defaults follow class &amp; event</span></h2>
       <div class="row2">
         <div><label>Tire compound</label>
@@ -391,13 +428,13 @@
             thing only.</div>
         </div>
       </details>
+      </div><!-- /#fitted -->
+      </div><!-- /#formfields -->
 
       <div class="btns">
         <button id="plan" class="alt">Build Plan</button>
         <button id="calc">Calculate</button>
-      </div>
-      <div class="btns" style="margin-top:9px">
-        <button id="save" disabled>Save Sheet</button>
+        <button id="save" disabled>Create Tune Sheet</button>
         <button id="lib" class="alt">Library</button>
       </div>
     </div>
@@ -2394,6 +2431,108 @@ function showResults(){
    recomputing: returning from the Library must not discard fine-tuning. */
 const formSig=i=>JSON.stringify(FIELDS.map(k=>i[k]==null?'':String(i[k])));
 let SIG=null;
+
+/* ===================== MODES =====================
+   Planning a build happens before a single part is bought, so the "what's
+   fitted" block and the gearing readings are not just optional there — they
+   are unanswerable. Showing them anyway invited filling them in with guesses.
+   The sheet step is the opposite problem: everything is known by then, and
+   what is wanted is a last look at it before the artifact gets made. */
+let MODE='tune';
+const MODEHINT={
+  plan :'Pre-purchase. Only the numbers you can read before you have spent anything &mdash; what is fitted comes later.',
+  tune :'Post-upgrade. The full stat block, the parts actually on the car, and the gearing readings.',
+  sheet:'Last look before the sheet is made. Check what is missing, then create it.'
+};
+function setMode(m){
+  MODE=m;
+  document.querySelectorAll('#modes button').forEach(b=>{
+    b.className = b.dataset.mode===m ? 'on' : '';
+  });
+  document.getElementById('modehint').innerHTML=MODEHINT[m];
+  const show=(id,on)=>{ const el=document.getElementById(id); if(el) el.style.display=on?'':'none'; };
+  show('formfields', m!=='sheet');
+  show('preflight',  m==='sheet');
+  show('fitted',     m==='tune');       // meaningless before anything is bought
+  show('plan',       m==='plan');
+  show('calc',       m==='tune');
+  show('save',       m==='sheet');
+  if(m==='sheet') renderPreflight();
+}
+
+/* What the sheet is about to say, and what it cannot say because it was never
+   entered. Nothing here blocks the export — a sheet with a missing year is
+   still a usable sheet — but a final drive that is a power-to-weight guess is
+   worth knowing about before it gets printed as if it were a tune. */
+function preflight(){
+  const g=id=>{ const el=document.getElementById(id); return el?String(el.value).trim():''; };
+  const rows=[], sec=t=>rows.push({h:t});
+  const row=(k,v,state,note)=>rows.push({k,v,state,note});
+  const has=v=>v!==''&&v!=null;
+
+  sec('Identity');
+  row('Car name', g('name')||'Untitled', has(g('name'))?'ok':'no',
+      has(g('name'))?'':'the sheet and the library entry will both say Untitled');
+  row('Year', g('year')||'&mdash;', has(g('year'))?'ok':'warn2',
+      has(g('year'))?'':'only affects the title');
+  row('Class / event', g('cls')+' &middot; '+(DISC[g('disc')]||{n:g('disc')}).n, 'ok');
+
+  sec('Stat block');
+  [['wt','Weight','lb'],['fw','Front','%'],['hp','Power','hp'],['tq','Torque','lb-ft']]
+    .forEach(([id,label,unit])=>row(label, has(g(id))?g(id)+' '+unit:'missing',
+      has(g(id))?'ok':'no', has(g(id))?'':'required &mdash; Calculate will refuse'));
+  row('Drivetrain', g('dt'), 'ok');
+  row('PI now', has(g('pi'))?g('pi'):'&mdash;', has(g('pi'))?'ok':'warn2',
+      has(g('pi'))?'':'not printed on the sheet, only used by Build Plan');
+
+  sec('Parts fitted');
+  row('Tires', (TIRE_N[g('tire')]||g('tire'))+(g('twf')===g('twr')?'':' &middot; +'+g('twf')+'/+'+g('twr')+' width'),'ok');
+  row('Suspension', g('susp'), 'ok');
+  row('Anti-roll bars', g('arb'), 'ok');
+  row('Differential', g('diff'), 'ok');
+  row('Gearbox', g('trans')+' &middot; '+g('gr')+'-speed', 'ok');
+  row('Aero', g('aero'), 'ok');
+
+  sec('Gearing');
+  const anchored=has(g('fdfit'))&&has(g('vgraph'));
+  row('Chart readings', anchored?g('fdfit')+' fit &middot; '+g('vgraph')+' max':'not entered',
+      anchored?'ok':'no',
+      anchored?'':'without both, the final drive is a power-to-weight guess and there are no gear speeds');
+  row('Final drive', BASE?fmt('fd',eff('fd')):'&mdash;',
+      BASE?(BASE.fdSrc==='rough'?'no':'ok'):'no',
+      !BASE?'nothing calculated yet':BASE.fdSrc==='rough'?'a guess &mdash; verify it on the graph first':'');
+
+  sec('Tune');
+  row('Calculated', BASE?'yes':'no', BASE?'ok':'no', BASE?'':'run Calculate tune before exporting');
+  const n=Object.keys(ADJ).length;
+  row('Fine-tune edits', n?n+' change'+(n>1?'s':''):'none', 'ok',
+      n?'listed on the sheet as adjustments from baseline':'');
+  return rows;
+}
+
+function renderPreflight(){
+  const rows=preflight(), bad=rows.filter(r=>r.state==='no').length;
+  const mark={ok:'<span class="ok">&check;</span>',no:'<span class="no">&times;</span>',
+              warn2:'<span class="warn2">&ndash;</span>'};
+  document.getElementById('preflight').innerHTML=
+    '<div class="pf">'+rows.map(r=>r.h
+      ? '<h3>'+r.h+'</h3>'
+      : '<div class="r">'+(mark[r.state]||'')+'<div class="k">'+r.k+
+        (r.note?'<div style="font-size:11px;opacity:.75;margin-top:1px">'+r.note+'</div>':'')+
+        '</div><div class="v">'+r.v+'</div></div>').join('')+'</div>'+
+    (bad
+      ? '<div class="warn" style="margin-top:10px"><b>'+bad+' thing'+(bad>1?'s':'')+
+        ' worth fixing first.</b> Nothing here blocks the export &mdash; go back to <b>Calculate tune</b>, fill them in, recalculate, and come back.</div>'
+      : '<div class="note" style="margin-top:10px;border:0;padding:0">Everything the sheet needs is here.</div>');
+  document.getElementById('save').disabled=!BASE;
+}
+
+document.getElementById('modes').addEventListener('click',e=>{
+  const m=e.target&&e.target.dataset&&e.target.dataset.mode;
+  if(m) setMode(m);
+});
+setMode('tune');   // calculating a tune is the default job. Called here, not up
+                   // with the other init: MODE is a `let` declared just above.
 
 document.getElementById('calc').onclick=()=>{
   const i=readForm(true); if(!i) return;

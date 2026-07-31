@@ -39,6 +39,27 @@ the community baselines (HokiHoshi's axle-share method, ForzaTune's documented
 FH6 bands). If you touch a formula in the `compute()` function, sanity-check
 the output against a few real cars by hand, not just the test suite.
 
+## Three modes, chosen before anything is typed
+
+`setMode('plan'|'tune'|'sheet')` — default `tune`. The picker sits above the car
+name because the answer decides which fields are worth showing:
+
+- **Plan build** hides `#fitted` entirely (tires, widths, suspension, ARBs,
+  transmission, diff, aero, and the gearing readings). Planning happens before a
+  single part is bought, so those are not optional there — they are
+  unanswerable, and showing them invited filling them in with guesses.
+- **Calculate tune** shows everything. This is the default job.
+- **Tune sheet** swaps the form for `renderPreflight()` — a checklist of exactly
+  what is about to land on the sheet, with what is missing marked. It never
+  blocks the export (a sheet with no year is still a usable sheet); it only
+  refuses when nothing has been calculated. The one item worth reading is
+  "Chart readings": without them the final drive is a power-to-weight guess, and
+  the sheet would print it as though it were a tune.
+
+`preflight()` returns structured rows so it can be asserted directly; it reads
+the live form rather than `BASE`, so it reflects edits made since the last
+calculate. `modes.test.js` covers the visibility matrix and the gap-flagging.
+
 ## Architecture
 
 Everything lives in `index.html`: styles, the tune-calculation engine

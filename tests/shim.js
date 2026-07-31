@@ -54,6 +54,12 @@ function makeShim() {
   const document = {
     getElementById: id => els[id] || (els[id] = fakeEl()),
     querySelector: () => ({ textContent: '' }),
+    /* The mode picker walks its own buttons to set the active class. There is
+       no real DOM tree here, so hand back stand-ins carrying the data-mode
+       each button would have — enough for setMode() to run without a browser. */
+    querySelectorAll: sel => sel === '#modes button'
+      ? ['plan', 'tune', 'sheet'].map(m => ({ dataset: { mode: m }, className: '' }))
+      : [],
     addEventListener() {},
     createElement: () => fakeEl(),
     activeElement: { blur() {} }
