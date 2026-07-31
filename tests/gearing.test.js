@@ -117,6 +117,26 @@ ok('drag gears the top gear right to the axis maximum',
 ok('no axis maximum means no speeds, not wrong speeds', at({ fdfit: 4.575 }).gearTop === null);
 ok('no fit means no speeds', at({ vgraph: 159 }).gearTop === null);
 
+console.log('--- the model states a falsifiable prediction and checks itself ---');
+r = at({ fdfit: 4.575, vgraph: 159 });
+ok('predicts a top speed', near(r.topPredict, 159 * 0.95, 0.5), r.topPredict.toFixed(1));
+ok('drag predicts the full axis maximum',
+   near(at({ disc: 'drag', tire: 'dragt', fdfit: 4.575, vgraph: 159 }).topPredict, 159, 0.5));
+ok('never predicts past the axis maximum',
+   at({ disc: 'drag', tire: 'dragt', fdfit: 4.0, vgraph: 159 }).topPredict <= 159);
+// a measured top speed that contradicts the model is called out, not absorbed
+r = at({ fdfit: 4.575, vgraph: 159, vmax: 120 });
+ok('flags a top speed the model cannot explain',
+   /do not agree with your top speed/.test(r.w.join(' ')));
+ok('offers the innocent explanation first',
+   /measured at a different final drive/.test(r.w.join(' ')));
+ok('says to distrust the section, not work around it',
+   /distrusted until it is checked/.test(r.w.join(' ')));
+ok('an agreeing top speed passes quietly',
+   !/do not agree with your top speed/.test(at({ fdfit: 4.575, vgraph: 159, vmax: 159 }).w.join(' ')));
+ok('no axis maximum means no check to fail',
+   !/do not agree with your top speed/.test(at({ fdfit: 4.575, vmax: 100 }).w.join(' ')));
+
 console.log('--- the graph is described as it actually behaves ---');
 const set = (id, v) => { document.getElementById(id).value = v; };
 Object.keys(GR86).forEach(k => set(k, typeof GR86[k] === 'number' && isNaN(GR86[k]) ? '' : GR86[k]));
@@ -129,6 +149,9 @@ const withMph = els['out'].innerHTML;
 ok('speeds appear beside the ratios', /to 151 mph/.test(withMph),
    (withMph.match(/to \d+ mph/g) || []).join(' '));
 ok('all seven gears annotated', (withMph.match(/to \d+ mph/g) || []).length === 7);
+ok('card invites the check', /Check me on this/.test(withMph));
+ok('card names the top speed to expect', /Top Speed of about <b>151 mph<\/b>/.test(withMph));
+ok('card says what a mismatch means', /the model behind every number in this section is wrong/.test(withMph));
 els['save'].onclick();
 ok('sheet carries the speeds too', /class="gear-mph">151</.test(blob.parts[0]));
 set('vgraph', ''); set('fdfit', '4.72'); els['calc'].onclick();

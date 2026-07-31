@@ -370,15 +370,19 @@
           show the speed every gear runs out at.</div>
 
         <div style="border-top:1px solid var(--line);margin-top:12px;padding-top:8px">
-          <div class="hint" style="margin-bottom:2px">Optional &mdash; sharpens the notes, and gives
-            a fallback final drive if the field above is blank.</div>
+          <div class="hint" style="margin-bottom:2px">Optional &mdash; cross-checks the gearing, and
+            gives a fallback final drive if the fit above is blank.</div>
           <div class="row2">
-            <div><label>Top speed (mph)</label>
-              <input id="vmax" type="number" inputmode="decimal" placeholder="145.4"></div>
+            <div><label>Top speed at the fit</label>
+              <input id="vmax" type="number" inputmode="decimal" placeholder="159"></div>
             <div><label>Redline (rpm)</label>
               <input id="rpm" type="number" inputmode="decimal" placeholder="7400"></div>
           </div>
           <label>Tire size</label><input id="tsize" placeholder="275/35R19">
+          <div class="hint" style="margin-top:8px">Read Top speed with the final drive sat on the
+            fit, not after you apply the answer &mdash; that is the car's real maximum, and it
+            should come out near Graph max. If it does not, the gearing maths is wrong and the app
+            will say so rather than quietly using it.</div>
         </div>
       </details>
 
@@ -987,6 +991,19 @@ function compute(i){
   const kSpeed=(fdSrc==='fit'&&isFinite(i.vgraph)&&i.vgraph>0)
     ? i.vgraph*i.fdfit*topGear : null;
   const gearTop=kSpeed ? SPREAD[i.gr].map(g=>kSpeed/(fd*g)) : null;
+  /* The falsifiable claim. Geared at or below the axis maximum the car should
+     reach its top gear's limiter, so predicted top speed is that limiter speed
+     — capped at the axis, which is as fast as the car goes however it is
+     geared. Printed on the card so every build invites the check that caught
+     the last wrong model. */
+  const topPredict=gearTop ? Math.min(gearTop[i.gr-1],i.vgraph) : null;
+  /* And checked outright when a measured top speed is on hand. A real
+     disagreement means an assumption is broken, which is worth saying plainly
+     rather than quietly printing numbers derived from it. */
+  if(topPredict&&isFinite(i.vmax)&&i.vmax>0&&Math.abs(i.vmax-topPredict)/topPredict>0.06)
+    w.push('<b>These numbers do not agree with your top speed.</b> From the fit and the '+
+      Math.round(i.vgraph)+' mph axis this gearing should top out around '+Math.round(topPredict)+
+      ' mph, but you entered '+Math.round(i.vmax)+'. Either the top speed was measured at a different final drive than the fit &mdash; in which case ignore this &mdash; or an assumption behind the gearing maths is wrong and the whole section should be distrusted until it is checked.');
   if(fdSrc==='fit'&&fd>i.fdfit*1.001&&i.gr>=7)
     w.push('<b>Worth counting your gears.</b> If the top one or two were running off the end of the speed graph before this, they were never doing anything &mdash; that is PI spent on ratios the car cannot reach. A '+(i.gr-1)+'-speed geared properly beats a '+i.gr+'-speed with a dead gear on top.');
   if(i.disc==='rally'&&!['rally','offroad'].includes(i.tire)) w.push('<b>Tires:</b> Rally tires are non-negotiable on dirt &mdash; slicks lose more to grip than they save in PI.');
@@ -1046,7 +1063,7 @@ function compute(i){
   const v={};
   for(const k in raw) v[k]= raw[k]==null ? null : snap(k,raw[k]);
 
-  return {i,d,PI,f,w,v,fdSrc,gearTop,gears:SPREAD[i.gr]};
+  return {i,d,PI,f,w,v,fdSrc,gearTop,topPredict,gears:SPREAD[i.gr]};
 }
 
 /* ===================== ADJUSTMENT ENGINE ===================== */
@@ -1128,7 +1145,10 @@ function render(){
     '<div class="gears">'+r.gears.map((g,n)=>'<div class="g"><span>'+(n+1)+(n===0?'st':n===1?'nd':n===2?'rd':'th')+'</span><span>'+g.toFixed(2)+
       (r.gearTop?' <span style="color:var(--dim)">&middot; to '+Math.round(r.gearTop[n])+' mph</span>':'')+
       '</span></div>').join('')+'</div>'+
-    (r.gearTop?'<div class="note" style="margin-top:8px">Speeds are where each gear meets the limiter at this final drive, from your fit and the '+Math.round(r.i.vgraph)+' mph axis. Every one is reachable &mdash; that is the point of the fit.</div>':'')));
+    (r.gearTop
+      ? '<div class="note" style="margin-top:8px">Speeds are where each gear meets the limiter at this final drive, from your fit and the '+Math.round(r.i.vgraph)+' mph axis. Every one is reachable &mdash; that is the point of the fit.'+
+        '<br><br><b>Check me on this.</b> With '+fmt('fd',eff('fd'))+' set, the Performance panel should read a Top Speed of about <b>'+Math.round(r.topPredict)+' mph</b>, and the last line should stop '+Math.round((1-r.d.vFrac)*100)+'% short of the right edge rather than on it. If the game says something materially different, the model behind every number in this section is wrong &mdash; that is worth reporting, not working around.</div>'
+      : '')));
 
   const noAlign=locked('camF','camR','toeF','toeR','cast');
   R.push(sec('var(--align)','Alignment',
