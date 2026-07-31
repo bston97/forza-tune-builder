@@ -227,6 +227,27 @@ there is nothing honest to compare against, since the axis sits ~13 mph above
 anything the car reaches; `compute()` says so and asks for the number rather
 than guessing.
 
+### The Performance panel's Top Speed is NOT an achieved speed — do not use it
+
+Settled 2026-07-31 by Boston: that figure is the maximum the car would reach
+with **the entire build and tune aimed at top speed — aero included**, not the
+speed it does on the gearing and setup currently fitted. On a downforce circuit
+build it sits far above anything you will ever see.
+
+The app spent several revisions treating it as achieved speed and built three
+things on it: naming the gear the car runs out in, marking gears "never used",
+and warning when it sat above the top gear's limiter. Under the correct reading
+the last of those fires on almost every build, which is exactly what Boston
+reported. **All three are withdrawn and the input is gone from the form.** Do
+not reintroduce anything that measures a tune against that number.
+
+What replaced it: the ratio set aims top gear at the **graph maximum** instead.
+That is a fixed reading off the chart with one meaning, it needs no
+interpretation, and it is exactly where the fit puts top gear — a setting that
+measured well on the sweep. Everything the gearing section does now derives from
+two unambiguous chart readings (fit, graph max) plus the final drive the user
+chooses.
+
 ### The final drive is the user's input, not the app's output
 
 The last recurring gearing failure (2026-07-31, "it keeps saying something is

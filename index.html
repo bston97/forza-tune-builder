@@ -379,20 +379,16 @@
           every gear runs out at.</div>
 
         <div style="border-top:1px solid var(--line);margin-top:12px;padding-top:8px">
-          <div class="row2">
-            <div><label>Final drive you run <span class="hint">opt.</span></label>
-              <input id="fdset" type="number" inputmode="decimal" step="0.01" placeholder="4.58"></div>
-            <div><label>Top speed at it <span class="hint">opt.</span></label>
-              <input id="vmax" type="number" inputmode="decimal" placeholder="143.5"></div>
-          </div>
-          <div class="hint" style="margin-top:8px">These two are a <b>pair</b> &mdash; set whatever
-            final drive you like in game, read Top Speed off the Performance panel right there, and
-            enter both together. Everything below (gear speeds, which gears engage, the ratio set)
-            is then worked out at <em>your</em> setting, and top gear gets aimed at the top speed
-            you actually recorded. Leave the final drive blank and the app falls back to the fit;
-            leave top speed blank and you still get limiter speeds, but no ratios and no verdict.
-            Expect top speed well under Graph max &mdash; the end of the axis is not a speed the
-            car reaches.</div>
+          <label>Final drive you run <span class="hint">opt.</span></label>
+          <input id="fdset" type="number" inputmode="decimal" step="0.01" placeholder="4.58">
+          <div class="hint" style="margin-top:8px">Set whatever final drive you like in game and
+            enter it &mdash; every gear figure below is then worked out at <em>your</em> setting
+            rather than at a suggestion, and you get ratios to match it.<br><br><b>The app no
+            longer asks for Top Speed.</b> That figure is the maximum the car would do with the
+            whole build and tune aimed at speed &mdash; aero and all &mdash; so on a downforce
+            build it is far above anything you will see, and nothing here can safely be measured
+            against it. Everything now comes off the two chart readings above, which mean one
+            thing only.</div>
         </div>
       </details>
 
@@ -778,18 +774,23 @@ const h5=v=>Math.round(v*2)/2;
    section that was properly verified, checked against the graph on all seven
    gears within 2%.
 
-   topsIn is the gear the car is in when it runs out: the first whose limiter
-   sits at or above measured top speed. Null when top speed is past every gear,
-   which means it was read at a different final drive — an earlier version fell
-   back to the top gear there and printed an impossible speed underneath a
-   warning saying it was impossible. */
-function gearsAt(kSpeed,gr,fd,vmax,ratios){
-  if(!kSpeed||!(fd>0)) return {tops:null,topsIn:null,bogus:false,ceil:null};
-  const tops=ratios.map(g=>kSpeed/(fd*g)), ceil=tops[gr-1], reach=ceil*1.03;
-  const have=isFinite(vmax)&&vmax>0;
-  return {tops, ceil,
-    topsIn: have&&vmax<=reach ? (tops.findIndex(s=>s>=vmax)+1)||gr : null,
-    bogus:  have&&vmax>reach};
+   WHAT IS NOT DERIVED HERE, AND WHY. Earlier versions used the Performance
+   panel's Top Speed to name the gear the car runs out in, mark gears "never
+   used", and warn when that speed sat above the top gear's limiter. All three
+   assumed that figure is the speed the car ACHIEVES on the gearing currently
+   fitted. Boston (2026-07-31, and he plays the game) says it is the projected
+   maximum — what the car would do geared purely for top speed — which makes it
+   an upper bound, not an achieved speed.
+
+   His own sweep fits neither reading cleanly: a pure ceiling would be constant
+   across final drives and it moves 140.0 to 144.4. So the meaning is genuinely
+   unresolved, and every claim resting on "achieved" has been withdrawn rather
+   than guessed at a fourth time. Do not reinstate any of them without a
+   confirmed answer. Limiter speeds stay — those are kinematics and verified. */
+function gearsAt(kSpeed,gr,fd,ratios){
+  if(!kSpeed||!(fd>0)) return {tops:null,ceil:null};
+  const tops=ratios.map(g=>kSpeed/(fd*g));
+  return {tops, ceil:tops[gr-1]};
 }
 
 /* Ratios that put every gear to work at a given final drive.
@@ -800,14 +801,26 @@ function gearsAt(kSpeed,gr,fd,vmax,ratios){
    hanging off the end unused. The gears between are spaced geometrically, i.e.
    an equal rpm drop on every shift.
 
-   HONEST LIMIT: that every gear gets used is arithmetic and certain. That the
-   spacing is *faster* than the game's progressive default is NOT known and
+   TOP GEAR IS AIMED AT THE GRAPH MAXIMUM, not at the Performance panel's Top
+   Speed. That figure turned out to be the projected maximum for a build tuned
+   *entirely* for speed — aero included (Boston, 2026-07-31) — so on a downforce
+   circuit build the car never gets near it and aiming there would gear the top
+   end absurdly tall. The axis maximum is a fixed reading off the chart with no
+   such ambiguity, and it is exactly where the fit puts top gear, which measured
+   well on the sweep.
+
+   Consequence worth understanding: pick a shorter final drive and the top ratio
+   stretches to compensate, holding the same top-end speed while every gear below
+   gets closer. That is what a close-ratio box with a short final drive is.
+
+   HONEST LIMIT: that the ratios descend and cover the range is arithmetic. That
+   the spacing is *faster* than the game's progressive default is NOT known and
    cannot be, because optimum spacing depends on the engine's power curve and
    no screen exposes it. This is a hypothesis to A/B on the Performance panel,
    not a claim. */
-function ratioSet(kSpeed,gr,fd,vmax,ratios){
-  if(!kSpeed||!(fd>0)||!(isFinite(vmax)&&vmax>0)) return null;
-  const V1=kSpeed/(fd*ratios[0]), Vn=vmax*1.03;
+function ratioSet(kSpeed,gr,fd,vgraph,ratios){
+  if(!kSpeed||!(fd>0)||!(isFinite(vgraph)&&vgraph>0)) return null;
+  const V1=kSpeed/(fd*ratios[0]), Vn=vgraph;
   if(!(Vn>V1*1.15)) return null;                    // too few gears' worth of range
   const step=Math.pow(Vn/V1,1/(gr-1)), out=[];
   for(let n=0;n<gr;n++){
@@ -1013,11 +1026,9 @@ function compute(i){
   let fd, fdSrc='rough', fdRaw=null;
   if(isFinite(i.fdset)&&i.fdset>0){
     /* The user's own final drive wins outright. This field exists because the
-       app used to judge the entered top speed against the ceiling at its OWN
-       recommendation — so anyone running a longer final drive than the rec got
-       "something does not add up" on perfectly correct inputs, every build.
-       The pair (fdset, vmax) is read together at one setting, and everything
-       downstream is computed at that setting. */
+       app used to compute every gear figure at its OWN recommendation, so
+       anyone running a different setting — which is the whole point of letting
+       him choose — got numbers describing a car he was not driving. */
     fd=cl(i.fdset,2.00,7.00);
     fdSrc='user';
   } else if(isFinite(i.fdfit)&&i.fdfit>0){
@@ -1074,8 +1085,8 @@ function compute(i){
   /* Derived at whatever final drive is being asked about, so the card can
      recompute against a hand-edited one. compute() answers for its own
      recommendation; render() re-runs this against eff('fd'). */
-  const G0=gearsAt(kSpeed,i.gr,fd,i.vmax,SPREAD[i.gr]);
-  const gearTop=G0.tops, topsIn=G0.topsIn, topBogus=G0.bogus;
+  const G0=gearsAt(kSpeed,i.gr,fd,SPREAD[i.gr]);
+  const gearTop=G0.tops;
   /* topCeil is where top gear meets the limiter — a ceiling on top speed, NOT a
      prediction of it. Measured 2026-07-31 on the GR86: at final drive 4.82 top
      gear redlined at 148 and the car topped out at 140.0, because at 140 in
@@ -1094,17 +1105,12 @@ function compute(i){
      the band the measurement actually supports and hands the pick to the
      Performance panel. */
   const fdBand=fdSrc==='fit' ? [snap('fd',fd*0.81),snap('fd',fd*1.06)] : null;
-  /* A measured top speed at or under that ceiling is ordinary — the car is
-     power-limited before the limiter, which is normal. Above it is impossible
-     and means an input is wrong. */
-  if(topCeil&&isFinite(i.vmax)&&i.vmax>topCeil*1.03)
-    w.push('<b>Top speed and final drive disagree.</b> At '+fmt('fd',fd)+
-      ', top gear meets the limiter at '+Math.round(topCeil)+' mph, so the car cannot do the '+
-      Math.round(i.vmax)+' you entered &mdash; nothing goes faster than its own rev limiter. The two have to be read as a pair, at the same setting: whatever final drive is on the car when you read Top Speed is the one to put in <b>Final drive you run</b>.');
-  /* The dead-gear finding lives in the gear list now, beside the ratio it is
-     about, rather than as five sentences of red above it. A warning strip is
-     for things that are wrong; a gear you cannot reach is just a fact about
-     the build, and it reads better next to the number. */
+  /* NO warning fires on top speed sitting above the top gear's limiter any
+     more. That check assumed the Performance panel's Top Speed is a speed the
+     car achieves on the fitted gearing; if it is instead the projected maximum
+     for ideal gearing, then sitting above the limiter is the normal case and
+     the warning was pure noise — which is exactly what Boston reported, on
+     build after build. Withdrawn until the figure's meaning is settled. */
   if(i.disc==='rally'&&!['rally','offroad'].includes(i.tire)) w.push('<b>Tires:</b> Rally tires are non-negotiable on dirt &mdash; slicks lose more to grip than they save in PI.');
   if(i.disc==='cc'&&i.tire!=='offroad') w.push('<b>Tires:</b> Cross-country needs off-road tires, max width.');
   if(['rally','cc'].includes(i.disc)&&i.dt!=='AWD') w.push('<b>Drivetrain:</b> AWD is effectively mandatory for '+DISC[i.disc].n+'.');
@@ -1162,7 +1168,7 @@ function compute(i){
   const v={};
   for(const k in raw) v[k]= raw[k]==null ? null : snap(k,raw[k]);
 
-  return {i,d,PI,f,w,v,fdSrc,gearTop,topCeil,topsIn,topBogus,fdBand,kSpeed,gears:SPREAD[i.gr]};
+  return {i,d,PI,f,w,v,fdSrc,gearTop,topCeil,fdBand,kSpeed,gears:SPREAD[i.gr]};
 }
 
 /* ===================== ADJUSTMENT ENGINE ===================== */
@@ -1217,14 +1223,13 @@ const ORDN=n=>n+(n===1?'st':n===2?'nd':n===3?'rd':'th');
    not information, it is a number the user will never see on their dash — so
    once top speed is known, say plainly where the car runs out and which gears
    never come in, rather than printing 179 mph at someone doing 141. */
-function gearMark(g,i,n){
+/* Just where each gear meets the limiter. The "tops out here" and "never used"
+   labels are gone: both required knowing the speed the car actually reaches on
+   this gearing, and the Performance panel's Top Speed may be a projected
+   ceiling instead. Verified kinematics only. */
+function gearMark(g,n){
   if(!g.tops) return '';
-  const dim=t=>' <span style="color:var(--dim)">&middot; '+t+'</span>';
-  if(!g.topsIn) return dim('to '+Math.round(g.tops[n])+' mph');
-  if(n+1===g.topsIn) return ' <span style="color:var(--mod)">&middot; tops out here, '+
-    Math.round(i.vmax)+' mph</span>';
-  if(n>0&&g.tops[n-1]>=i.vmax) return dim('never used');
-  return dim('to '+Math.round(g.tops[n])+' mph');
+  return ' <span style="color:var(--dim)">&middot; to '+Math.round(g.tops[n])+' mph</span>';
 }
 
 function sec(c,t,rows,note,extra){
@@ -1249,8 +1254,8 @@ function render(){
      recommended — so editing it by hand moves the whole gear table with it.
      It did not, before: you could set your own final drive and the speeds
      underneath would quietly still describe the old one. */
-  const G=gearsAt(r.kSpeed,i.gr,eff('fd'),i.vmax,r.gears);
-  const RS=ratioSet(r.kSpeed,i.gr,eff('fd'),i.vmax,r.gears);
+  const G=gearsAt(r.kSpeed,i.gr,eff('fd'),r.gears);
+  const RS=ratioSet(r.kSpeed,i.gr,eff('fd'),i.vgraph,r.gears);
   R.push(sec('var(--gear)','Gearing',[['Final Drive',vin('fd')]],
     (i.trans==='stock'
       ? '<b>No final drive slider on a stock gearbox</b> &mdash; fit at least a Sport transmission before any of this can be entered. The figure below is what to set once you have.<br><br>'
@@ -1267,31 +1272,22 @@ function render(){
       rough:'<b>A guess from power-to-weight. Do not drive off on it.</b> Sweep the final drive until top gear\'s line finishes in the graph\'s top-right corner &mdash; still climbing as it reaches the right edge &mdash; put that setting in the Gearing box on the left, and calculate again.'
      })[r.fdSrc]+'</div>'+
     '<div class="gears">'+r.gears.map((g,n)=>'<div class="g"><span>'+ORDN(n+1)+'</span><span>'+g.toFixed(2)+
-      gearMark(G,i,n)+'</span></div>').join('')+'</div>'+
+      gearMark(G,n)+'</span></div>').join('')+'</div>'+
     (G.tops
-      ? '<div class="note" style="margin-top:8px">'+
-        (G.topsIn
-          ? (G.topsIn<i.gr
-              ? '<b>'+ORDN(G.topsIn)+' is your last usable gear</b> at these ratios &mdash; you never reach the '+
-                Math.round(G.tops[G.topsIn-1])+' mph that shifts you into '+ORDN(G.topsIn+1)+'.'+
-                (RS?' The set below fixes that without touching the final drive.':' Gearing shorter brings it in, or a '+G.topsIn+'-speed costs less PI for the same drive.')
-              : 'Every gear comes in, and the car runs out in '+ORDN(G.topsIn)+'.')
-          : G.bogus
-            ? '<b>The top speed you entered does not fit these gears</b> &mdash; it is past what top gear can even rev to here, so the list above cannot say where you run out. Read it again at <b>'+fmt('fd',eff('fd'))+'</b>, not at the fit; see the warning above.'
-            : 'Add <b>Top speed at that setting</b> and this list will also show where the car runs out and whether the top gear does anything.')+
-        '</div>'
+      ? '<div class="note" style="margin-top:8px">Where each gear meets the limiter at '+fmt('fd',eff('fd'))+
+        '. <b>Which of them you actually reach is a question this cannot answer</b> &mdash; that needs the speed the car hits on <em>this</em> gearing, and the Performance panel\'s Top Speed may instead be the maximum it would do geared purely for speed. Compare these against the graph and you will see where your shifts land.</div>'
       : '')+
     /* Individual ratios — the thing the app previously refused to touch. Offered
        only when the speeds are anchored, and framed as a hypothesis, because
        whether this spacing is FASTER cannot be known without the power curve. */
     (RS
       ? '<div class="note" style="margin-top:10px"><b>Or set these ratios and keep your own final drive.</b> '+
-        'Same 1st as the game\'s, top gear pulled in to '+Math.round(RS.gears[i.gr-1].v)+
-        ' mph so it actually engages, and an equal '+RS.drop+'% rpm drop on every shift.'+
+        'Same 1st as the game\'s, top gear placed at '+Math.round(RS.gears[i.gr-1].v)+
+        ' mph &mdash; just past the Top Speed you entered, so the car can use its full range whether that figure is what it reaches or what it could reach &mdash; and an equal '+RS.drop+'% rpm drop on every shift.'+
         '<div class="gears" style="margin-top:8px">'+RS.gears.map((x,n)=>
           '<div class="g"><span>'+ORDN(n+1)+'</span><span>'+x.g.toFixed(2)+
           ' <span style="color:var(--dim)">&middot; to '+Math.round(x.v)+' mph</span></span></div>').join('')+'</div>'+
-        '<div style="margin-top:8px"><b>A hypothesis, not an upgrade.</b> That every gear gets used is certain &mdash; arithmetic off your fit. That the spacing is <em>quicker</em> than the game\'s cannot be known without the engine\'s power curve, which no screen shows. Set them, read 0&ndash;60 and 0&ndash;100, compare. If the defaults win, use the defaults.</div></div>'
+        '<div style="margin-top:8px"><b>A hypothesis, not an upgrade.</b> The spacing is arithmetic off your fit; whether it is <em>quicker</em> than the game\'s cannot be known without the engine\'s power curve, which no screen shows. Set them, read 0&ndash;60 and 0&ndash;100, compare. If the defaults win, use the defaults.</div></div>'
       : '')));
 
   const noAlign=locked('camF','camR','toeF','toeR','cast');
@@ -2216,7 +2212,7 @@ const slug=s=>s.toLowerCase().replace(/[^a-z0-9]+/g,'_').replace(/^_+|_+$/g,'')|
 
 /* ===================== WIRE-UP ===================== */
 const FIELDS=['name','year','cls','disc','wt','fw','hp','tq','dt','pi','gr','tire','aero','twf','twr',
-              'susp','arb','trans','diff','fdfit','vgraph','fdset','vmax'];
+              'susp','arb','trans','diff','fdfit','vgraph','fdset'];
 let restored=false;
 try{
   const s=JSON.parse(localStorage.getItem('fh6last')||'null');
@@ -2367,7 +2363,7 @@ function readForm(needStats){
   const i={name:g('name').trim(),year:g('year').trim(),cls:g('cls'),disc:g('disc'),wt:n('wt'),fw:n('fw'),
            hp:n('hp'),tq:n('tq'),dt:g('dt'),pi:n('pi'),gr:parseInt(g('gr')),tire:g('tire'),
            aero:g('aero'),twf:n('twf'),twr:n('twr'),susp:g('susp'),arb:g('arb'),trans:g('trans'),diff:g('diff'),
-           vmax:n('vmax'),fdfit:n('fdfit'),vgraph:n('vgraph'),fdset:n('fdset')};
+           fdfit:n('fdfit'),vgraph:n('vgraph'),fdset:n('fdset')};
   const req=needStats ? [['wt','Weight'],['fw','Front %'],['hp','HP'],['tq','Torque']]
                       : [['wt','Weight'],['hp','HP']];
   for(const [k,lbl] of req){
@@ -2432,7 +2428,7 @@ document.getElementById('lib').onclick=()=>{
    the next car's brake balance and "exact" final drive. Class, event and the
    visible dropdowns stay: they're the context you're building in. */
 document.getElementById('newcar').onclick=()=>{
-  ['name','year','wt','fw','hp','tq','pi','vmax','fdfit','vgraph','fdset']
+  ['name','year','wt','fw','hp','tq','pi','fdfit','vgraph','fdset']
     .forEach(id=>{ document.getElementById(id).value=''; });
   document.getElementById('twf').value='0'; document.getElementById('twr').value='0';
   document.getElementById('trans').value='sport'; document.getElementById('diff').value='race';

@@ -34,11 +34,11 @@ ok('plan has no NaN', !/NaN|undefined/.test(els['out'].innerHTML));
 console.log('--- New car clears everything typed, keeps context ---');
 set('name', 'Evo'); set('year', '2004'); set('wt', '3241'); set('fw', '57'); set('hp', '612');
 set('tq', '480'); set('twf', '2'); set('twr', '3');
-set('vmax', '191'); set('fdfit', '4.20'); set('vgraph', '160'); set('cls', 'S1'); set('disc', 'touge');
+set('fdset', '3.90'); set('fdfit', '4.20'); set('vgraph', '160'); set('cls', 'S1'); set('disc', 'touge');
 els['calc'].onclick();
 ok('calc worked first', els['save'].disabled === false);
 els['newcar'].onclick();
-const cleared = ['name', 'year', 'wt', 'fw', 'hp', 'tq', 'pi', 'vmax', 'fdfit', 'vgraph']
+const cleared = ['name', 'year', 'wt', 'fw', 'hp', 'tq', 'pi', 'fdfit', 'vgraph', 'fdset']
   .every(id => els[id].value === '');
 ok('all typed fields cleared (incl hidden optional)', cleared);
 ok('width/trans/diff reset to defaults',
@@ -52,15 +52,15 @@ console.log('--- library: load clears unset fields, delete needs two taps ---');
 set('name', 'Evo'); set('year', '2004'); set('cls', 'A'); set('disc', 'sprint');
 set('wt', '3241'); set('fw', '57'); set('hp', '612'); set('tq', '480'); set('dt', 'AWD');
 set('gr', '6'); set('tire', 'semi'); set('aero', 'both');
-set('vmax', ''); set('fdfit', ''); set('vgraph', ''); set('twf', ''); set('twr', '');
+set('fdset', ''); set('fdfit', ''); set('vgraph', ''); set('twf', ''); set('twr', '');
 els['calc'].onclick(); els['save'].onclick();
 ok('saved to library', X.libLoad().length === 1);
 // dirty the optional fields, then Load — they must come back empty
-set('vmax', '999'); set('fdfit', '9.99'); set('vgraph', '999');
+set('fdset', '9.99'); set('fdfit', '9.99'); set('vgraph', '999');
 const key = encodeURIComponent(X.libLoad()[0].k);
 els['out'].fire('click', { target: { dataset: { load: key } } });
 ok('load clears fields the build did not set',
-  els['vmax'].value === '' && els['fdfit'].value === '' && els['vgraph'].value === '');
+  els['fdset'].value === '' && els['fdfit'].value === '' && els['vgraph'].value === '');
 ok('load auto-calculated', /Antiroll/.test(els['out'].innerHTML));
 
 els['lib'].onclick();

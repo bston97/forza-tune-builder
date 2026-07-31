@@ -106,34 +106,51 @@ ok('a solved build does not carry the warning',
 ok('a stock gearbox does not nag about it',
    !/is a guess, not a tune/.test(at({ trans: 'stock' }).w.join(' ')));
 
-console.log('--- each of the three inputs does a distinct job ---');
-/* Boston asked whether any of the three could go now that he sets the final
-   drive himself. None can: fit x graph max IS the speed constant, so neither
-   works alone, and top speed is what top gear gets aimed at.
-
-   Note top speed used to change nothing at all — that was true for about an
-   hour, between the tire solve being removed and ratioSet arriving. The form
-   said so, and that claim went stale the moment ratios started depending on
-   it. Hence this test. */
+console.log('--- what top speed is for, now that its meaning is unsettled ---');
+/* Boston, 2026-07-31: the Performance panel's Top Speed is the projected
+   maximum for ideal gearing, not the speed the car reaches on the gearing
+   fitted. His own sweep fits neither reading cleanly (a pure ceiling would be
+   constant across final drives; it moved 140.0 to 144.4). So every claim that
+   needed "achieved" was withdrawn rather than guessed at again. */
 {
   const without = at({ fdfit: 4.575, vgraph: 157 });
   const with_ = at({ fdfit: 4.575, vgraph: 157, vmax: 141.5 });
-  ok('top speed still changes no slider value',
+  ok('top speed changes no slider value',
      Object.keys(without.v).every(k => without.v[k] === with_.v[k]));
   ok('and no limiter speed', JSON.stringify(without.gearTop) === JSON.stringify(with_.gearTop));
-  ok('but it does decide the used/unused verdict',
-     without.topsIn === null && with_.topsIn === 7);
-  ok('and it does decide the ratio set',
-     !/Or set these ratios/.test(draw({ fdfit: '4.58', vgraph: '157', vmax: '' })) &&
-     /Or set these ratios/.test(draw({ fdfit: '4.58', vgraph: '157', vmax: '141.5' })));
-  ok('the form no longer claims it changes nothing',
-     !/This changes no tune value/.test(HTML));
-  ok('and says the pair must be read together', /These two are a <b>pair<\/b>/.test(HTML));
+  ok('the ratio set needs only the two chart readings',
+     /Or set these ratios/.test(draw({ fdfit: '4.58', vgraph: '157' })) &&
+     !/Or set these ratios/.test(draw({ fdfit: '4.58', vgraph: '' })));
+  ok('no gear is ever labelled "tops out here"', !/tops out here/.test(draw({ fdfit: '4.58', vgraph: '157' })));
+  ok('no gear is ever labelled "never used"', !/never used/.test(draw({ fdfit: '4.58', vgraph: '157' })));
+  ok('nothing computes which gear the car runs out in',
+     with_.topsIn === undefined && with_.topBogus === undefined);
+  ok('the card says it cannot answer that',
+     /Which of them you actually reach is a question this cannot answer/.test(
+       draw({ fdfit: '4.58', vgraph: '157', vmax: '141.5' })));
+  ok('the form no longer asks for top speed at all',
+     !/id="vmax"/.test(HTML) && /no\s+longer asks for Top Speed/.test(HTML));
 
   ok('the fit alone gives nothing', at({ fdfit: 4.575 }).gearTop === null);
   ok('graph max alone gives nothing', at({ vgraph: 157 }).gearTop === null);
   ok('the two together are the anchor', at({ fdfit: 4.575, vgraph: 157 }).kSpeed > 0);
-  ok('the form explains they multiply', /multiply together into this car's speed\s+constant/.test(HTML));
+}
+
+console.log('--- the false alarm is gone for good ---');
+/* The check that fired on build after build: it read a top speed above the top
+   gear's limiter as an impossible input. Under Boston's reading that is the
+   ordinary case, not an error. */
+{
+  const over = at({ fdfit: 4.575, vgraph: 157, fdset: 4.58, vmax: 200 });
+  ok('a top speed way above the limiter no longer warns',
+     !/disagree|does not add up/.test(over.w.join(' ')), over.w.join(' ').slice(0, 70));
+  ok('and still produces gear speeds', Array.isArray(over.gearTop));
+  ok('and still produces ratios',
+     /Or set these ratios/.test(draw({ fdfit: '4.58', vgraph: '157', fdset: '4.58', vmax: '200' })));
+  ok('no build carries a gearing disagreement warning',
+     ['road', 'sprint', 'touge', 'drift', 'drag', 'rally', 'cc'].every(disc =>
+       !/disagree|does not add up/.test(at({ disc, dt: disc === 'rally' || disc === 'cc' ? 'AWD' : 'RWD',
+         fdfit: 4.575, vgraph: 157, fdset: 3.20, vmax: 175 }).w.join(' '))));
 }
 
 console.log('--- two paths only: the fit, or an admitted guess ---');
@@ -176,43 +193,6 @@ ok('speeds fall in gear order', r.gearTop.every((v, n) => n === 0 || v > r.gearT
 ok('drag reaches furthest past the axis',
    at({ disc: 'drag', tire: 'dragt', fdfit: 4.575, vgraph: 159 }).gearTop[6] > r.gearTop[6]);
 
-console.log('--- a gear earns its place by being reached, not by fitting the chart ---');
-/* You shift into gear N where gear N-1 runs out, so the test is that speed
-   against top speed — independent of whether the line fits on the axis. The
-   verdict belongs beside the ratio it is about, not in five sentences of red
-   above it: the warning strip is for things that are wrong, and a gear you
-   cannot reach is just a fact about the build. */
-r = at({ fdfit: 4.575, vgraph: 157, vmax: 141.5 });
-ok('at the fit every gear engages', r.topsIn === 7, r.topsIn);
-ok('no red warning for it', !r.w.join(' ').includes('never engage'));
-ok('drag, geared long, runs out lower down',
-   at({ disc: 'drag', tire: 'dragt', fdfit: 4.575, vgraph: 157, vmax: 141.5 }).topsIn <= 6);
-ok('a car that reaches everything tops out in top gear',
-   at({ fdfit: 4.575, vgraph: 157, vmax: 156 }).topsIn === 7);
-/* 200 is past what top gear can rev to, so it is a bad reading, not a fast car
-   — this used to fall back to the top gear and print an impossible speed. */
-ok('a top speed past every gear is refused, not rounded to top gear',
-   at({ fdfit: 4.575, vgraph: 157, vmax: 200 }).topsIn === null);
-ok('no top speed means no verdict', at({ fdfit: 4.575, vgraph: 157 }).topsIn === null);
-ok('no axis maximum means no verdict either', at({ fdfit: 4.575, vmax: 141.5 }).topsIn === null);
-
-console.log('--- top gear\'s limiter is a ceiling, not a predicted top speed ---');
-/* Measured 2026-07-31 at final drive 4.82: top gear redlined at 148 mph and
-   the car did 140.0, because by then the engine is past peak power. A previous
-   revision printed the ceiling as the predicted top speed and was out by 11. */
-r = at({ fdfit: 4.575, vgraph: 159 });
-ok('exposes a ceiling', near(r.topCeil, 159, 1), r.topCeil.toFixed(1));
-ok('a top speed under the ceiling is normal, not an error',
-   !/does not add up/.test(at({ fdfit: 4.575, vgraph: 159, vmax: 140 }).w.join(' ')));
-ok('a top speed above the ceiling is impossible and flagged',
-   /Top speed and final drive disagree/.test(
-     at({ fdfit: 4.575, vgraph: 159, vmax: 200 }).w.join(' ')));
-ok('the flag names the likely cause',
-   /read as a pair, at the same setting/.test(
-     at({ fdfit: 4.575, vgraph: 159, vmax: 200 }).w.join(' ')));
-ok('no axis maximum means no ceiling to check',
-   !/does not add up/.test(at({ fdfit: 4.575, vmax: 300 }).w.join(' ')));
-
 console.log('--- the card leads with the setting, not an essay ---');
 /* What shipped before this: a 179 mph figure beside 7th on a car doing 141,
    under 450 words of prose arguing with itself. The number is what gets read. */
@@ -222,78 +202,25 @@ const words = h => { const g = h.indexOf('>Gearing</h3>'), n = h.indexOf('<div c
 
 const full = draw({ fdfit: '4.58', vgraph: '157', vmax: '141.5' });
 ok('opens with the number to set', /<b>Set 4\.58<\/b>/.test(full));
-/* Road is 1.00, so there is no division to show — dressing "x ÷ 1.00" up as a
-   calculation invites Boston's fair question of why he is typing a number in
-   just to have it handed back. Say plainly that the fit is the setting, and
-   what the input actually buys (the gear list). */
 ok('does not fake a calculation at vFrac 1.00', !/&divide; 1\.00/.test(full));
 ok('says the fit is the setting', /your fit unchanged/.test(full));
-ok('says you can set your own final drive', /enter your own under <b>Final drive you run<\/b>/.test(full));
-ok('a discipline that does scale still shows the working',
-   /4\.58 &divide; 0\.76/.test(draw({ disc: 'touge', fdfit: '4.58', vgraph: '157', vmax: '' })));
+ok('says you can set your own final drive',
+   /enter your own under <b>Final drive you run<\/b>/.test(full));
 ok('offers the sweep band', /sweep <b>3\.\d\d&ndash;4\.\d\d<\/b>/.test(full),
    (full.match(/sweep <b>[\d.]+&ndash;[\d.]+<\/b>/) || [])[0]);
-ok('hands the decision to the Performance panel', /sweep <b>[^<]*<\/b> against the Performance panel/.test(full));
-ok('marks where the car runs out', /tops out here, 142 mph/.test(gearBlock(full)));
-/* At the fit every gear engages — which is the whole reason road is 1.00.
-   Boston: "if 7th is never used why would you not adjust the gears so it is". */
-ok('at the fit nothing is marked unused', !/never used/.test(gearBlock(full)),
-   gearBlock(full).replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim());
-ok('and it says so', /Every gear comes in, and the car runs out in 7th/.test(full));
-/* Two gear tables now, so the ceiling is higher than the 170 it was when the
-   section was prose only — but it is still a hard cap, since the thing that
-   went wrong before was 450 words of argument nobody reads. */
-ok('the whole section stays short', words(full) < 270, words(full) + ' words');
+ok('hands the decision to the Performance panel',
+   /sweep <b>[^<]*<\/b> against the Performance panel/.test(full));
+ok('gear list carries limiter speeds', /to 44 mph/.test(gearBlock(full)));
+ok('every gear annotated', (gearBlock(full).match(/to \d+ mph/g) || []).length === 7);
+ok('the whole section stays short', words(full) < 320, words(full) + ' words');
 
-// a car that runs out far below its gearing still gets the honest verdict
-const dead = draw({ fdfit: '4.58', vgraph: '157', vmax: '120' });
-ok('marks the gear that never comes in', /never used/.test(gearBlock(dead)));
-ok('does NOT print a speed the car cannot reach', !/157 mph/.test(gearBlock(dead)),
-   gearBlock(dead).replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim());
-ok('names the last usable gear', /<b>6th is your last usable gear<\/b> at these ratios/.test(dead));
-/* Boston: "if you are able to do the ratios correctly between gears I can just
-   set the final drive as I'd like." So a dead gear now points at the ratio set
-   that fixes it at HIS final drive, rather than at changing the final drive. */
-ok('points at the ratio set, not at moving the final drive',
-   /The set below fixes that without touching the final drive/.test(dead));
-ok('and that set is actually offered', /Or set these ratios and keep your own final drive/.test(dead));
-
-const noTop = draw({ fdfit: '4.58', vgraph: '157', vmax: '' });
-ok('without top speed it still lists limiter speeds', /to 157 mph/.test(gearBlock(noTop)));
-ok('and asks for the one number that would sharpen it',
-   /Add <b>Top speed at that setting<\/b>/.test(noTop));
-ok('but claims nothing about which gears are used',
-   !/never used|last usable gear/.test(noTop));
+const noTop = draw({ fdfit: '4.58', vgraph: '' });
+ok('without graph max the ratios stop but the card survives', /Set 4\.58/.test(noTop));
+ok('but no ratio set', !/Or set these ratios/.test(noTop));
 
 const guess = draw({ fdfit: '', vgraph: '', vmax: '' });
 ok('an unsolved final drive still shouts', /is a guess, not a tune/.test(guess));
 ok('and the gear list carries no invented speeds', !/mph/.test(gearBlock(guess)));
-
-console.log('--- an impossible top speed is refused, not absorbed ---');
-/* Boston's rally build: fit 2.86, axis 164, top speed 149 read AT THE FIT. The
-   recommendation is 3.62, where top gear only revs to 130 — so 149 is
-   impossible there. findIndex returns -1, and an earlier `|| i.gr` fallback
-   turned that into "7th tops out here, 149 mph" printed directly beneath a
-   warning saying the car cannot do 149. The card contradicted itself. */
-{
-  const bogus = X.compute(Object.assign({}, GR86, { disc: 'rally', dt: 'AWD', tire: 'rally',
-    susp: 'rally', diff: 'rally', fdfit: 2.86, vgraph: 164, vmax: 149 }));
-  ok('spots the impossible reading', bogus.topBogus === true);
-  ok('refuses to name a gear it tops out in', bogus.topsIn === null, bogus.topsIn);
-  ok('still warns', /Top speed and final drive disagree/.test(bogus.w.join(' ')));
-  const page = draw({ disc: 'rally', dt: 'AWD', tire: 'rally', susp: 'rally', diff: 'rally',
-    fdfit: '2.86', vgraph: '164', vmax: '149' });
-  ok('gear list shows the real limiter, not the impossible figure',
-     /0\.82[\s\S]{0,90}to 130 mph/.test(page) && !/tops out here, 149/.test(page));
-  ok('does not claim every gear comes in', !/Every gear comes in/.test(page));
-  ok('says the reading does not fit and where to re-read it',
-     /top speed you entered does not fit these gears/.test(page) &&
-     /Read it again at <b>3\.62<\/b>/.test(page));
-  // a reading taken at the recommended setting behaves normally again
-  const fixed = X.compute(Object.assign({}, GR86, { disc: 'rally', dt: 'AWD', tire: 'rally',
-    susp: 'rally', diff: 'rally', fdfit: 2.86, vgraph: 164, vmax: 128 }));
-  ok('a valid reading is accepted', fixed.topBogus === false && fixed.topsIn === 7);
-}
 
 console.log('--- your final drive, my ratios ---');
 /* Boston: "if you are able to do the ratios correctly between gears I can just
@@ -301,14 +228,13 @@ console.log('--- your final drive, my ratios ---');
 {
   // 1. the gear table must follow a hand-edited final drive. It did not.
   draw({ fdfit: '4.58', vgraph: '157', vmax: '141.5' });
-  const atRec = (els['out'].innerHTML.match(/to \d+ mph|tops out here, \d+/g) || []).join(' ');
+  const atRec = (els['out'].innerHTML.match(/to \d+ mph/g) || []).join(' ');
   els['out'].fire('change', { target: { dataset: { k: 'fd' }, value: '3.00' } });
-  const atMine = (els['out'].innerHTML.match(/to \d+ mph|tops out here, \d+/g) || []).join(' ');
+  const atMine = (els['out'].innerHTML.match(/to \d+ mph/g) || []).join(' ');
   ok('gear speeds follow a hand-set final drive', atRec !== atMine);
   ok('and they are right at the new one', /to 67 mph/.test(atMine), atMine.slice(0, 40));
-  ok('a too-tall final drive strands gears', /never used/.test(els['out'].innerHTML));
 
-  // 2. ratios that use every gear at whatever final drive is set
+  // 2. ratios that cover the range at whatever final drive is set
   const page = els['out'].innerHTML;
   ok('offers a ratio set', /Or set these ratios and keep your own final drive/.test(page));
   const sets = page.match(/<div class="gears"[^>]*>[\s\S]*?<\/div><\/div>/g) || [];
@@ -321,33 +247,21 @@ console.log('--- your final drive, my ratios ---');
      mine.slice(1).every((g, n) => Math.abs(g / mine[n] - mine[1] / mine[0]) < 0.02),
      mine.slice(1).map((g, n) => Math.round(g / mine[n] * 100) + '%').join(' '));
   const speeds = [...sets[1].matchAll(/to (\d+) mph/g)].map(m => +m[1]);
-  ok('top gear lands just past the real top speed', speeds[6] >= 141 && speeds[6] <= 152, speeds[6]);
-  ok('every gear reachable', speeds.every(s => s <= speeds[6]), speeds.join('/'));
+  ok('top gear placed at the graph maximum', speeds[6] === 157, speeds[6]);
   ok('called a hypothesis, not an upgrade', /A hypothesis, not an upgrade/.test(page));
   ok('says why it cannot be known', /without the engine's power curve/.test(page));
-  ok('tells you how to settle it', /read 0&ndash;60 and 0&ndash;100, compare/.test(page));
-  ok('no ratio set without a top speed to aim at',
-     !/Or set these ratios/.test(draw({ fdfit: '4.58', vgraph: '157', vmax: '' })));
+  ok('survives the ambiguity about what Top Speed means',
+     /whether that figure is what it reaches or what it could reach/.test(page));
 }
 
-console.log('--- your final drive is an input, and the pair is judged at it ---');
-/* The failure Boston hit on every build: he sets his own final drive, reads
-   top speed there, enters it — and the app judged that top speed against the
-   ceiling at its OWN recommendation. Run anything longer than the rec and
-   your real top speed becomes "impossible", on correct inputs, every time. */
+console.log('--- your final drive is an input, not a suggestion ---');
+/* The failure Boston hit on every build: he sets his own final drive, and the
+   app computed everything at its OWN recommendation instead. */
 {
-  // fd 3.60 with k=589: ceiling = 589/(3.60*0.82) ≈ 199. A 160 mph read there is fine.
-  const mine = at({ fdfit: 4.575, vgraph: 157, fdset: 3.60, vmax: 165 });
+  const mine = at({ fdfit: 4.575, vgraph: 157, fdset: 3.60, vmax: 160 });
   ok('the entered final drive wins', mine.fdSrc === 'user' && near(mine.v.fd, 3.60, 0.01), mine.v.fd);
-  ok('no false alarm on a correct pair', !/disagree/.test(mine.w.join(' ')), mine.w.join(' ').slice(0, 60));
-  ok('verdict computed at HIS setting', mine.topsIn === 6, mine.topsIn);
-  /* the same top speed without fdset reproduces the old failure — judged
-     against the road rec of 4.58, whose ceiling is 157 */
-  const old = at({ fdfit: 4.575, vgraph: 157, vmax: 165 });
-  ok('without the field, the same inputs still mislead', /disagree/.test(old.w.join(' ')));
-  // a pair that genuinely disagrees is still caught at the user's setting
-  const bad = at({ fdfit: 4.575, vgraph: 157, fdset: 4.60, vmax: 175 });
-  ok('a genuinely impossible pair is still flagged', /disagree/.test(bad.w.join(' ')));
+  ok('gear speeds computed at HIS setting',
+     Math.abs(mine.gearTop[6] - 589 / (3.60 * 0.82)) < 2, mine.gearTop[6].toFixed(1));
   ok('user fd needs no fit to be respected',
      at({ fdset: 3.85 }).fdSrc === 'user' && near(at({ fdset: 3.85 }).v.fd, 3.85, 0.01));
   ok('and does not get nagged as a guess', !/is a guess, not a tune/.test(at({ fdset: 3.85 }).w.join(' ')));
