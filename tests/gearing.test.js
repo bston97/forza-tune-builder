@@ -215,30 +215,35 @@ ok('opens with the number to set', /<b>Set 4\.58<\/b>/.test(full));
    what the input actually buys (the gear list). */
 ok('does not fake a calculation at vFrac 1.00', !/&divide; 1\.00/.test(full));
 ok('says the fit is the setting', /your fit unchanged/.test(full));
-ok('says what the fit is really for', /What the fit buys you is the gear list/.test(full));
+ok('says you can set your own final drive', /Or set your own and the table below follows it/.test(full));
 ok('a discipline that does scale still shows the working',
    /4\.58 &divide; 0\.76/.test(draw({ disc: 'touge', fdfit: '4.58', vgraph: '157', vmax: '' })));
 ok('offers the sweep band', /sweep <b>3\.\d\d&ndash;4\.\d\d<\/b>/.test(full),
    (full.match(/sweep <b>[\d.]+&ndash;[\d.]+<\/b>/) || [])[0]);
-ok('hands the decision to the Performance panel', /let the Performance panel decide/.test(full));
+ok('hands the decision to the Performance panel', /sweep <b>[^<]*<\/b> against the Performance panel/.test(full));
 ok('marks where the car runs out', /tops out here, 142 mph/.test(gearBlock(full)));
 /* At the fit every gear engages — which is the whole reason road is 1.00.
    Boston: "if 7th is never used why would you not adjust the gears so it is". */
 ok('at the fit nothing is marked unused', !/never used/.test(gearBlock(full)),
    gearBlock(full).replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim());
 ok('and it says so', /Every gear comes in, and the car runs out in 7th/.test(full));
-ok('the whole section stays short', words(full) < 170, words(full) + ' words');
+/* Two gear tables now, so the ceiling is higher than the 170 it was when the
+   section was prose only — but it is still a hard cap, since the thing that
+   went wrong before was 450 words of argument nobody reads. */
+ok('the whole section stays short', words(full) < 270, words(full) + ' words');
 
 // a car that runs out far below its gearing still gets the honest verdict
 const dead = draw({ fdfit: '4.58', vgraph: '157', vmax: '120' });
 ok('marks the gear that never comes in', /never used/.test(gearBlock(dead)));
 ok('does NOT print a speed the car cannot reach', !/157 mph/.test(gearBlock(dead)),
    gearBlock(dead).replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim());
-ok('names the last usable gear', /<b>6th is your last usable gear\.<\/b>/.test(dead));
-ok('says gearing shorter is the first move', /Gearing shorter brings it in/.test(dead));
-ok('and the shorter box only as the fallback', /a 6-speed drives the same for less PI/.test(dead));
-ok('notes it costs PI, not lap time',
-   /final drive cannot change the rpm drop per shift/.test(dead));
+ok('names the last usable gear', /<b>6th is your last usable gear<\/b> at these ratios/.test(dead));
+/* Boston: "if you are able to do the ratios correctly between gears I can just
+   set the final drive as I'd like." So a dead gear now points at the ratio set
+   that fixes it at HIS final drive, rather than at changing the final drive. */
+ok('points at the ratio set, not at moving the final drive',
+   /The set below fixes that without touching the final drive/.test(dead));
+ok('and that set is actually offered', /Or set these ratios and keep your own final drive/.test(dead));
 
 const noTop = draw({ fdfit: '4.58', vgraph: '157', vmax: '' });
 ok('without top speed it still lists limiter speeds', /to 157 mph/.test(gearBlock(noTop)));
@@ -275,6 +280,41 @@ console.log('--- an impossible top speed is refused, not absorbed ---');
   const fixed = X.compute(Object.assign({}, GR86, { disc: 'rally', dt: 'AWD', tire: 'rally',
     susp: 'rally', diff: 'rally', fdfit: 2.86, vgraph: 164, vmax: 128 }));
   ok('a valid reading is accepted', fixed.topBogus === false && fixed.topsIn === 7);
+}
+
+console.log('--- your final drive, my ratios ---');
+/* Boston: "if you are able to do the ratios correctly between gears I can just
+   set the final drive as I'd like." Two things had to work for that. */
+{
+  // 1. the gear table must follow a hand-edited final drive. It did not.
+  draw({ fdfit: '4.58', vgraph: '157', vmax: '141.5' });
+  const atRec = (els['out'].innerHTML.match(/to \d+ mph|tops out here, \d+/g) || []).join(' ');
+  els['out'].fire('change', { target: { dataset: { k: 'fd' }, value: '3.00' } });
+  const atMine = (els['out'].innerHTML.match(/to \d+ mph|tops out here, \d+/g) || []).join(' ');
+  ok('gear speeds follow a hand-set final drive', atRec !== atMine);
+  ok('and they are right at the new one', /to 67 mph/.test(atMine), atMine.slice(0, 40));
+  ok('a too-tall final drive strands gears', /never used/.test(els['out'].innerHTML));
+
+  // 2. ratios that use every gear at whatever final drive is set
+  const page = els['out'].innerHTML;
+  ok('offers a ratio set', /Or set these ratios and keep your own final drive/.test(page));
+  const sets = page.match(/<div class="gears"[^>]*>[\s\S]*?<\/div><\/div>/g) || [];
+  ok('shows it as a second table', sets.length === 2, sets.length + ' tables');
+  const mine = [...sets[1].matchAll(/<span>(\d\.\d\d)/g)].map(m => +m[1]);
+  ok('seven ratios', mine.length === 7, mine.join('/'));
+  ok('strictly descending', mine.every((g, n) => n === 0 || g < mine[n - 1]), mine.join('/'));
+  ok('keeps the game\'s 1st', mine[0] === X.SPREAD[7][0], mine[0]);
+  ok('equal rpm drop on every shift',
+     mine.slice(1).every((g, n) => Math.abs(g / mine[n] - mine[1] / mine[0]) < 0.02),
+     mine.slice(1).map((g, n) => Math.round(g / mine[n] * 100) + '%').join(' '));
+  const speeds = [...sets[1].matchAll(/to (\d+) mph/g)].map(m => +m[1]);
+  ok('top gear lands just past the real top speed', speeds[6] >= 141 && speeds[6] <= 152, speeds[6]);
+  ok('every gear reachable', speeds.every(s => s <= speeds[6]), speeds.join('/'));
+  ok('called a hypothesis, not an upgrade', /A hypothesis, not an upgrade/.test(page));
+  ok('says why it cannot be known', /without the engine's power curve/.test(page));
+  ok('tells you how to settle it', /read 0&ndash;60 and 0&ndash;100, compare/.test(page));
+  ok('no ratio set without a top speed to aim at',
+     !/Or set these ratios/.test(draw({ fdfit: '4.58', vgraph: '157', vmax: '' })));
 }
 
 console.log('--- discredited claims stay dead ---');
