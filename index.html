@@ -372,19 +372,20 @@
           every gear runs out at.</div>
 
         <div style="border-top:1px solid var(--line);margin-top:12px;padding-top:8px">
-          <div class="hint" style="margin-bottom:2px">Optional &mdash; cross-checks the gearing, and
-            gives a fallback final drive if the fit above is blank.</div>
+          <div class="hint" style="margin-bottom:2px">Optional second pass &mdash; set the final
+            drive this gives you, read Top Speed back off the Performance panel, and enter it here.
+            That is what says whether your top gear ever engages.</div>
           <div class="row2">
-            <div><label>Top speed at the fit</label>
-              <input id="vmax" type="number" inputmode="decimal" placeholder="159"></div>
+            <div><label>Top speed at that setting</label>
+              <input id="vmax" type="number" inputmode="decimal" placeholder="143.5"></div>
             <div><label>Redline (rpm)</label>
               <input id="rpm" type="number" inputmode="decimal" placeholder="7400"></div>
           </div>
           <label>Tire size</label><input id="tsize" placeholder="275/35R19">
-          <div class="hint" style="margin-top:8px">Read Top speed with the final drive sat on the
-            fit, not after you apply the answer &mdash; that is the car's real maximum, and it
-            should come out near Graph max. If it does not, the gearing maths is wrong and the app
-            will say so rather than quietly using it.</div>
+          <div class="hint" style="margin-top:8px">It has to be read at the <b>same</b> final drive
+            the gear speeds below are worked out for, or the comparison is meaningless &mdash; top
+            speed moves with the gearing. So: calculate, set what it says, then read. Expect it to
+            land well under Graph max; the end of the axis is not a speed the car reaches.</div>
         </div>
       </details>
 
@@ -1029,9 +1030,9 @@ function compute(i){
      power-limited before the limiter, which is normal. Above it is impossible
      and means an input is wrong. */
   if(topCeil&&isFinite(i.vmax)&&i.vmax>topCeil*1.03)
-    w.push('<b>Something does not add up in the gearing inputs.</b> Top gear meets the limiter at '+
-      Math.round(topCeil)+' mph here, so the car cannot do the '+Math.round(i.vmax)+
-      ' you entered &mdash; nothing goes faster than its own rev limiter. Most likely the fit and the top speed were read at different final drives, or the fit is not where top gear actually touched the edge.');
+    w.push('<b>Something does not add up in the gearing inputs.</b> At the final drive below, top gear meets the limiter at '+
+      Math.round(topCeil)+' mph, so the car cannot do the '+Math.round(i.vmax)+
+      ' you entered &mdash; nothing goes faster than its own rev limiter. Almost certainly the top speed was read at a <em>different</em> final drive than this one; it has to come from the setting the app is recommending, since top speed moves with the gearing.');
   /* A gear whose limiter sits past the end of the speed graph is one the car
      will not reach, so it is PI spent on a ratio that never engages. Measured
      on the GR86: at every final drive worth running it topped out in 6th, and
@@ -1044,6 +1045,10 @@ function compute(i){
      the chart and never be touched. Measured top speed is the real test; the
      axis maximum is only a stand-in when top speed was not entered. */
   if(gearTop&&i.gr>=6){
+      /* i.vmax must be top speed AT THE RECOMMENDED FINAL DRIVE, not at the fit:
+       gearTop is computed at `fd`, and top speed moves with the gearing, so a
+       reading from any other setting is not comparable. That makes this a
+       second pass — calculate, apply, read, re-enter. */
     const measured=isFinite(i.vmax)&&i.vmax>0, reach=measured?i.vmax:i.vgraph;
     const dead=gearTop.slice(0,-1).filter(s=>s>=reach).length;
     const shiftTop=gearTop[i.gr-2];
@@ -1055,7 +1060,7 @@ function compute(i){
       w.push('<b>Cannot tell whether your top gear does anything.</b> You shift into '+
         i.gr+(i.gr===2?'nd':i.gr===3?'rd':'th')+' at '+Math.round(shiftTop)+
         ' mph and the graph runs to '+Math.round(i.vgraph)+
-        ', but the end of the graph is not a speed the car reaches &mdash; it is just where the axis stops, and it sits well above any real top speed. Fill in <b>Top speed at the fit</b> and this becomes a straight comparison. On the reference GR86 the answer was no: you shift into 7th at 154 mph and it tops out at 143.5.');
+        ', but the end of the graph is not a speed the car reaches &mdash; it is just where the axis stops, and it sits well above any real top speed. Set the final drive below, read Top Speed off the Performance panel, put it in <b>Top speed at that setting</b>, and this becomes a straight comparison. On the reference GR86 the answer was no: you shift into 7th at 154 mph and it tops out at 143.5.');
     if(dead>0){
       /* How much of the tallest gear is actually drawn: its line starts where
          the gear below it runs out, so it shows as a stub whenever that shift
@@ -1066,7 +1071,7 @@ function compute(i){
         'You shift into '+i.gr+(i.gr===2?'nd':i.gr===3?'rd':'th')+' at '+Math.round(shiftInto)+
         ' mph, where '+(i.gr-1)+(i.gr-1===2?'nd':i.gr-1===3?'rd':'th')+' runs out, and the car '+
         (measured?'only reaches '+Math.round(i.vmax):'is unlikely to get past about '+Math.round(i.vgraph))+
-        ' mph'+(measured?'':' &mdash; enter Top speed at the fit for a proper check')+'. It never gets there.'+
+        ' mph'+(measured?'':' &mdash; enter Top speed at that setting for a proper check')+'. It never gets there.'+
         (stub>0&&stub<i.vgraph*0.15
           ? ' On the graph you will still see a short stub of it in the top-right corner &mdash; about '+
             Math.round(stub)+' mph of line before the edge. That is the shift point drawn, not a gear you use.'

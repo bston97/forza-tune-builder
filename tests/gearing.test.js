@@ -165,14 +165,20 @@ ok('quotes the measured figure', /only reaches 144 mph/.test(r.w.join(' ')));
 ok('a measured top speed above the shift point clears the gear',
    !/never engages/.test(at({ fdfit: 4.575, vgraph: 157, vmax: 156 }).w.join(' ')));
 
-/* Without a measured top speed the axis is the only comparison available, and
+/* i.vmax has to be top speed at the RECOMMENDED final drive, not at the fit:
+   gearTop is computed at that setting and top speed moves with the gearing, so
+   a reading from any other setting is not comparable. Hence the second pass —
+   calculate, apply, read, re-enter — and hence the "different final drive"
+   wording when the two cannot both be true.
+
+   Without a measured top speed the axis is the only comparison available, and
    it sits well above anything the car reaches — 13 mph above on the GR86. So a
    shift point just under the axis proves nothing, and the app says so rather
    than guessing in either direction. */
 const noTop = at({ fdfit: 4.575, vgraph: 157 }).w.join(' ');
 ok('admits it cannot tell without top speed', /Cannot tell whether your top gear does anything/.test(noTop));
 ok('explains why the axis will not do', /the end of the graph is not a speed the car reaches/.test(noTop));
-ok('asks for the one number that settles it', /Fill in <b>Top speed at the fit<\/b>/.test(noTop));
+ok('asks for the one number that settles it', /put it in <b>Top speed at that setting<\/b>/.test(noTop));
 ok('does not condemn the gear on a guess', !/never engages/.test(noTop));
 ok('counts more than one when more than one is dead',
    /Top 3 gears never engage/.test(
@@ -196,7 +202,7 @@ ok('a top speed above the ceiling is impossible and flagged',
    /Something does not add up in the gearing inputs/.test(
      at({ fdfit: 4.575, vgraph: 159, vmax: 200 }).w.join(' ')));
 ok('the flag names the likely cause',
-   /read at different final drives/.test(at({ fdfit: 4.575, vgraph: 159, vmax: 200 }).w.join(' ')));
+   /read at a <em>different<\/em> final drive than this one/.test(at({ fdfit: 4.575, vgraph: 159, vmax: 200 }).w.join(' ')));
 ok('no axis maximum means no ceiling to check',
    !/does not add up/.test(at({ fdfit: 4.575, vmax: 300 }).w.join(' ')));
 
