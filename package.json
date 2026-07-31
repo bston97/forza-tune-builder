@@ -1,0 +1,11 @@
+{
+  "name": "forza-tune-builder",
+  "version": "1.0.0",
+  "description": "FH6 tuning calculator, fine-tune loop, build planner and library — single-file, no build step.",
+  "private": true,
+  "scripts": {
+    "test": "node tests/run.js"
+  },
+  "repository": "github:bston97/forza-tune-builder",
+  "license": "UNLICENSED"
+}
