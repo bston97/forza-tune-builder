@@ -168,7 +168,11 @@ ok('no red warning for it', !r.w.join(' ').includes('never engage'));
 ok('drag, geared long, runs out lower down',
    at({ disc: 'drag', tire: 'dragt', fdfit: 4.575, vgraph: 157, vmax: 141.5 }).topsIn <= 6);
 ok('a car that reaches everything tops out in top gear',
-   at({ fdfit: 4.575, vgraph: 157, vmax: 200 }).topsIn === 7);
+   at({ fdfit: 4.575, vgraph: 157, vmax: 156 }).topsIn === 7);
+/* 200 is past what top gear can rev to, so it is a bad reading, not a fast car
+   — this used to fall back to the top gear and print an impossible speed. */
+ok('a top speed past every gear is refused, not rounded to top gear',
+   at({ fdfit: 4.575, vgraph: 157, vmax: 200 }).topsIn === null);
 ok('no top speed means no verdict', at({ fdfit: 4.575, vgraph: 157 }).topsIn === null);
 ok('no axis maximum means no verdict either', at({ fdfit: 4.575, vmax: 141.5 }).topsIn === null);
 
@@ -246,6 +250,32 @@ ok('but claims nothing about which gears are used',
 const guess = draw({ fdfit: '', vgraph: '', vmax: '' });
 ok('an unsolved final drive still shouts', /is a guess, not a tune/.test(guess));
 ok('and the gear list carries no invented speeds', !/mph/.test(gearBlock(guess)));
+
+console.log('--- an impossible top speed is refused, not absorbed ---');
+/* Boston's rally build: fit 2.86, axis 164, top speed 149 read AT THE FIT. The
+   recommendation is 3.62, where top gear only revs to 130 — so 149 is
+   impossible there. findIndex returns -1, and an earlier `|| i.gr` fallback
+   turned that into "7th tops out here, 149 mph" printed directly beneath a
+   warning saying the car cannot do 149. The card contradicted itself. */
+{
+  const bogus = X.compute(Object.assign({}, GR86, { disc: 'rally', dt: 'AWD', tire: 'rally',
+    susp: 'rally', diff: 'rally', fdfit: 2.86, vgraph: 164, vmax: 149 }));
+  ok('spots the impossible reading', bogus.topBogus === true);
+  ok('refuses to name a gear it tops out in', bogus.topsIn === null, bogus.topsIn);
+  ok('still warns', /Something does not add up/.test(bogus.w.join(' ')));
+  const page = draw({ disc: 'rally', dt: 'AWD', tire: 'rally', susp: 'rally', diff: 'rally',
+    fdfit: '2.86', vgraph: '164', vmax: '149' });
+  ok('gear list shows the real limiter, not the impossible figure',
+     /0\.82[\s\S]{0,90}to 130 mph/.test(page) && !/tops out here, 149/.test(page));
+  ok('does not claim every gear comes in', !/Every gear comes in/.test(page));
+  ok('says the reading does not fit and where to re-read it',
+     /top speed you entered does not fit these gears/.test(page) &&
+     /Read it again at <b>3\.62<\/b>/.test(page));
+  // a reading taken at the recommended setting behaves normally again
+  const fixed = X.compute(Object.assign({}, GR86, { disc: 'rally', dt: 'AWD', tire: 'rally',
+    susp: 'rally', diff: 'rally', fdfit: 2.86, vgraph: 164, vmax: 128 }));
+  ok('a valid reading is accepted', fixed.topBogus === false && fixed.topsIn === 7);
+}
 
 console.log('--- discredited claims stay dead ---');
 ok('no power curve on the graph',

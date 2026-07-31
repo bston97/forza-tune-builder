@@ -1017,10 +1017,18 @@ function compute(i){
   const topCeil=gearTop ? gearTop[i.gr-1] : null;
   /* Which gear the car is in when it runs out of speed — the first whose
      limiter sits at or above the measured top speed. Everything above it never
-     engages. Null without a measured top speed, because the axis cannot
-     stand in for one. */
-  const topsIn=(gearTop&&isFinite(i.vmax)&&i.vmax>0)
+     engages. Null without a measured top speed, because the axis cannot stand
+     in for one.
+
+     ALSO null when the top speed is past every gear's limiter, which means it
+     was read at a different final drive. An earlier version fell back to the
+     top gear there, and so printed "7th tops out here, 149 mph" directly under
+     a warning saying the car cannot do 149 — the card contradicting itself.
+     Same 3% tolerance as that warning, so the two never disagree. */
+  const reachable=gearTop ? gearTop[i.gr-1]*1.03 : 0;
+  const topsIn=(gearTop&&isFinite(i.vmax)&&i.vmax>0&&i.vmax<=reachable)
     ? (gearTop.findIndex(s=>s>=i.vmax)+1)||i.gr : null;
+  const topBogus=!!(gearTop&&isFinite(i.vmax)&&i.vmax>reachable);
   /* The sweep that calibrated vFrac also showed how flat this is: across
      3.50-4.82 on the GR86, 0-100 moved 0.12s and top speed 4.4 mph, with four
      of the six settings inside 1% of each other. Quoting one number to two
@@ -1096,7 +1104,7 @@ function compute(i){
   const v={};
   for(const k in raw) v[k]= raw[k]==null ? null : snap(k,raw[k]);
 
-  return {i,d,PI,f,w,v,fdSrc,gearTop,topCeil,topsIn,fdBand,gears:SPREAD[i.gr]};
+  return {i,d,PI,f,w,v,fdSrc,gearTop,topCeil,topsIn,topBogus,fdBand,gears:SPREAD[i.gr]};
 }
 
 /* ===================== ADJUSTMENT ENGINE ===================== */
@@ -1203,7 +1211,9 @@ function render(){
                 '. Gearing shorter brings it in &mdash; try the top of the sweep band &mdash; but if it will not come in without giving up real time, a '+
                 r.topsIn+'-speed drives the same for less PI. It is the ratio you bought that is wasted, not lap time: final drive cannot change the rpm drop per shift, only where the gears sit.'
               : 'Every gear comes in, and the car runs out in '+ORDN(r.topsIn)+'.')
-          : 'Add <b>Top speed at that setting</b> and this list will also show where the car runs out and whether the top gear does anything.')+
+          : r.topBogus
+            ? '<b>The top speed you entered does not fit these gears</b> &mdash; it is past what top gear can even rev to here, so the list above cannot say where you run out. Read it again at <b>'+fmt('fd',eff('fd'))+'</b>, not at the fit; see the warning above.'
+            : 'Add <b>Top speed at that setting</b> and this list will also show where the car runs out and whether the top gear does anything.')+
         '</div>'
       : '')));
 
