@@ -178,14 +178,23 @@ default, final drive the only variable, fit = 4.575):
 
 Three things came out of it:
 
-1. **`vFrac` for road is 1.14, not 0.95 — the guess was inverted.** The optimum
-   is 4.00 against a 4.575 fit, so the right move is gearing *longer* than the
-   fit by 14%, with top gear redlining past the end of the chart. That is fine
-   precisely because the car cannot reach the chart edge. The old 0.95 pushed
-   toward 4.82, which measured **worst of the six** — it won 0-60 by 0.016s and
-   lost on both other counts. The other six disciplines are this scaled by 1.2,
-   preserving the relative ordering that was already there; **only road is
-   measured.**
+1. **`vFrac` for road is 1.00 — gear at the fit.** Getting here took two wrong
+   answers, and the reasoning matters more than the number. The original 0.95
+   was a guess and pushed toward 4.82, which measured **worst of the six**. The
+   replacement, 1.14, was fitted to whichever setting won 0-100 (4.00, by
+   0.035s) — but nothing dominates: 4.58 wins 0-60 by 0.048s, 3.50 wins top
+   speed, and the whole range spans 0.12s. **Fitting a constant to the winner
+   of one metric across noise that small is overfitting, and it produced a
+   recommendation that left the 7th ratio doing nothing.** What actually breaks
+   the tie is that at the fit every gear engages, while at 4.00 the car tops out
+   in 6th. Same lap time either way; one of them uses the gearbox you paid for.
+   The other six disciplines are scaled from road, preserving the ordering that
+   was already there; **only road is measured.**
+
+   Note this is a **PI** argument, not a shift-quality one. The rpm drop per
+   shift is fixed by the ratio steps (70/78/81/85/86/86% on the GR86 7-speed)
+   and final drive scales all gears together, so it cannot change shift quality
+   — only where in the speed range the gears sit.
 2. **The surface is flat.** 0.12s across the whole 0-100 range and 4.4 mph of
    top speed, with four of six settings inside 1%. Quoting a final drive to two
    decimals implies precision the game does not reward, so `compute()` returns

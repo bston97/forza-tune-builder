@@ -427,33 +427,40 @@ const classForPI=pi=>{ const b=PI_BANDS.find(x=>pi<=x[1]); return b?b[0]:'X'; };
    for that axle's share of the weight). <1 front + >1 rear = rotation trim.
 
    vFrac: final drive = fdFit / vFrac, where fdFit is the setting that puts top
-   gear on the right edge of the speed graph. ABOVE 1.0 means gearing LONGER
-   than that fit — top gear redlining past the edge, which is fine because the
-   car cannot reach the edge anyway.
+   gear on the right edge of the speed graph. Above 1.0 gears longer than that
+   fit; below 1.0, shorter.
 
-   Road was measured 2026-07-31 by sweeping the final drive on a 2022 GR86 and
-   reading the Performance panel at each stop (see CLAUDE.md for the table).
-   The optimum landed at 4.00 against a 4.575 fit, so 4.575/4.00 = 1.14. The
-   previous 0.95 was guessed, and guessed in the wrong direction — it pushed
-   toward 4.82, which measured worst of the six settings tried.
+   ROAD IS 1.00 — gear at the fit — and the reasoning matters, because a
+   previous revision had 1.14 here off a single metric.
 
-   The other six are that measurement scaled by 1.2, preserving the relative
-   ordering that was already here. Only road is measured. */
+   Sweeping the GR86 (table in CLAUDE.md) spread 0-60 by 0.113s, 0-100 by
+   0.122s and top speed by 4.4 mph across 3.50-4.82. No setting dominates: 4.00
+   won 0-100 by 0.035s, 4.58 won 0-60 by 0.048s, 3.50 won top speed. Picking
+   4.00 because it won one of the three was overfitting to noise.
+
+   What breaks the tie is that at 4.58 — which is the fit — every gear engages,
+   while at 4.00 the car tops out in 6th and the 7th ratio is PI doing nothing.
+   Same lap time either way, one of them uses what you bought. Note this is a
+   PI argument, not a shift-quality one: rpm drop per shift is set purely by
+   the ratio steps (70/78/81/85/86/86%) and final drive cannot change it.
+
+   The other six are scaled from road, preserving the ordering that was already
+   here. Only road is measured. */
 const DISC={
  road  :{n:'Road / Circuit', fF:1.00,fR:0.97, zF:.62,zR:.62, aF:0.93,aR:1.05,
-         camF:-2.2,camR:-1.3, toeF:0.0,toeR:-0.1, cast:6.7, rhF:0,rhR:0, fd:3.70, vFrac:1.14, dec:15, aeF:60},
+         camF:-2.2,camR:-1.3, toeF:0.0,toeR:-0.1, cast:6.7, rhF:0,rhR:0, fd:3.70, vFrac:1.00, dec:15, aeF:60},
  sprint:{n:'Sprint / Speed Race', fF:0.98,fR:0.95, zF:.60,zR:.60, aF:0.95,aR:1.02,
-         camF:-2.0,camR:-1.2, toeF:0.0,toeR:-0.1, cast:6.7, rhF:0,rhR:0, fd:3.55, vFrac:1.17, dec:12, aeF:55},
+         camF:-2.0,camR:-1.2, toeF:0.0,toeR:-0.1, cast:6.7, rhF:0,rhR:0, fd:3.55, vFrac:1.03, dec:12, aeF:55},
  touge :{n:'Touge', fF:0.94,fR:0.90, zF:.58,zR:.58, aF:0.88,aR:1.10,
-         camF:-2.4,camR:-1.4, toeF:0.1,toeR:-0.1, cast:6.7, rhF:10,rhR:15, fd:4.20, vFrac:0.87, dec:10, aeF:65},
+         camF:-2.4,camR:-1.4, toeF:0.1,toeR:-0.1, cast:6.7, rhF:10,rhR:15, fd:4.20, vFrac:0.76, dec:10, aeF:65},
  drift :{n:'Drift', fF:0.88,fR:1.12, zF:.55,zR:.65, aF:0.60,aR:1.35,
-         camF:-2.8,camR:-1.0, toeF:0.3,toeR:0.1, cast:7.0, rhF:5,rhR:15, fd:3.50, vFrac:1.08, dec:5, aeF:50},
+         camF:-2.8,camR:-1.0, toeF:0.3,toeR:0.1, cast:7.0, rhF:5,rhR:15, fd:3.50, vFrac:0.95, dec:5, aeF:50},
  drag  :{n:'Drag', fF:1.10,fR:0.88, zF:.60,zR:.50, aF:1.00,aR:0.70,
-         camF:-0.5,camR:-0.2, toeF:0.0,toeR:0.0, cast:5.0, rhF:0,rhR:5, fd:3.30, vFrac:1.20, dec:0, aeF:0},
+         camF:-0.5,camR:-0.2, toeF:0.0,toeR:0.0, cast:5.0, rhF:0,rhR:5, fd:3.30, vFrac:1.05, dec:0, aeF:0},
  rally :{n:'Dirt Rally', fF:0.62,fR:0.60, zF:.68,zR:.68, aF:0.22,aR:0.24,
-         camF:-1.2,camR:-0.8, toeF:0.1,toeR:-0.2, cast:6.0, rhF:75,rhR:75, fd:4.40, vFrac:0.90, dec:12, aeF:50},
+         camF:-1.2,camR:-0.8, toeF:0.1,toeR:-0.2, cast:6.0, rhF:75,rhR:75, fd:4.40, vFrac:0.79, dec:12, aeF:50},
  cc    :{n:'Cross-Country', fF:0.52,fR:0.50, zF:.70,zR:.70, aF:0.15,aR:0.16,
-         camF:-0.8,camR:-0.5, toeF:0.0,toeR:-0.2, cast:6.0, rhF:100,rhR:100, fd:4.80, vFrac:0.84, dec:15, aeF:50}
+         camF:-0.8,camR:-0.5, toeF:0.0,toeR:-0.2, cast:6.0, rhF:100,rhR:100, fd:4.80, vFrac:0.74, dec:15, aeF:50}
 };
 
 const PSI={stock:27,street:27,sport:27.5,semi:31,slick:31.5,rally:25,offroad:24,dragt:28};
@@ -1031,7 +1038,7 @@ function compute(i){
      decimals implies a precision the game does not reward, so the card offers
      the band the measurement actually supports and hands the pick to the
      Performance panel. */
-  const fdBand=fdSrc==='fit' ? [snap('fd',fd*0.93),snap('fd',fd*1.14)] : null;
+  const fdBand=fdSrc==='fit' ? [snap('fd',fd*0.81),snap('fd',fd*1.06)] : null;
   /* A measured top speed at or under that ceiling is ordinary — the car is
      power-limited before the limiter, which is normal. Above it is impossible
      and means an input is wrong. */
@@ -1202,7 +1209,8 @@ function render(){
           ? (r.topsIn<r.i.gr
               ? '<b>'+ORDN(r.topsIn)+' is your last usable gear.</b> You never reach the '+
                 Math.round(r.gearTop[r.topsIn-1])+' mph that shifts you into '+ORDN(r.topsIn+1)+
-                ', so that ratio is PI you are not using &mdash; a '+r.topsIn+'-speed would drive the same.'
+                '. Gearing shorter brings it in &mdash; try the top of the sweep band &mdash; but if it will not come in without giving up real time, a '+
+                r.topsIn+'-speed drives the same for less PI. It is the ratio you bought that is wasted, not lap time: final drive cannot change the rpm drop per shift, only where the gears sit.'
               : 'Every gear comes in, and the car runs out in '+ORDN(r.topsIn)+'.')
           : 'Add <b>Top speed at that setting</b> and this list will also show where the car runs out and whether the top gear does anything.')+
         '</div>'

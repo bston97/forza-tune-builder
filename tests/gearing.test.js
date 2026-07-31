@@ -48,15 +48,15 @@ ok('SPREAD[7] matches the screen',
    X.SPREAD[7].join(' / '));
 
 console.log('--- the fit solve ---');
-/* vFrac was measured 2026-07-31, not guessed: sweeping the GR86's final drive
-   and reading the Performance panel put the road optimum at 4.00 against a
-   4.575 fit, so road vFrac = 4.575/4.00 = 1.14. Above 1.0 means gearing
-   LONGER than the fit. The previous 0.95 pushed the other way, toward 4.82,
-   which measured worst of the six settings tried. */
+/* Road is 1.00 — gear at the fit. The GR86 sweep spread 0-60 by 0.113s, 0-100
+   by 0.122s and top speed by 4.4 mph across 3.50-4.82 with no setting
+   dominating, so picking the 0-100 winner (4.00, by 0.035s) was overfitting to
+   noise. What breaks the tie is that the fit engages every gear while 4.00
+   leaves the 7th ratio doing nothing. Same lap time, one uses what you bought. */
 let r = at({ fdfit: 4.575 });
 ok('uses the fit path', r.fdSrc === 'fit', r.fdSrc);
-ok('road reproduces the measured optimum', near(r.v.fd, 4.00, 0.02), r.v.fd);
-ok('road gears LONGER than the fit, not shorter', r.v.fd < 4.575, '4.575 -> ' + r.v.fd);
+ok('road gears at the fit', near(r.v.fd, 4.575, 0.01), r.v.fd);
+ok('and the fit is inside the measured flat zone', r.v.fd >= 3.50 && r.v.fd <= 4.82, r.v.fd);
 ok('needs no tire size or top speed',
    at({ fdfit: 4.575, tsize: '325/30R21', rpm: 9000, vmax: 200 }).v.fd === r.v.fd);
 
@@ -74,7 +74,7 @@ ok('every discipline lands in the slider range',
 ok('the band brackets the recommendation',
    r.fdBand[0] < r.v.fd && r.fdBand[1] > r.v.fd, r.fdBand.join(' - '));
 ok('the band spans roughly the measured flat zone',
-   near(r.fdBand[1] / r.fdBand[0], 1.14 / 0.93, 0.05), (r.fdBand[1] / r.fdBand[0]).toFixed(3));
+   near(r.fdBand[1] / r.fdBand[0], 1.06 / 0.81, 0.05), (r.fdBand[1] / r.fdBand[0]).toFixed(3));
 
 console.log('--- past the end of the slider ---');
 r = at({ disc: 'cc', dt: 'AWD', tire: 'offroad', susp: 'offroad', fdfit: 6.4 });
@@ -122,11 +122,11 @@ ok('7th at fd 3.73 sits far past it', K / (3.73 * 0.82) > 190, (K / (3.73 * 0.82
 
 r = at({ fdfit: 4.575, vgraph: 159 });
 ok('gear speeds computed', Array.isArray(r.gearTop) && r.gearTop.length === 7);
-ok('top gear redlines vFrac past the axis maximum',
-   near(r.gearTop[6], 159 * 1.14, 1), r.gearTop[6].toFixed(1));
+ok('top gear finishes on the axis maximum',
+   near(r.gearTop[6], 159, 1), r.gearTop[6].toFixed(1));
 /* Deliberately past the end of the chart now — the car cannot reach the axis
    maximum anyway, so gearing to it throws away the top of the box. */
-ok('top gear sits beyond the chart, by design', r.gearTop[6] > 159,
+ok('top gear lands on the chart edge, not past it', Math.abs(r.gearTop[6] - 159) < 1,
    r.gearTop.map(v => Math.round(v)).join('/'));
 ok('speeds fall in gear order', r.gearTop.every((v, n) => n === 0 || v > r.gearTop[n - 1]));
 ok('drag reaches furthest past the axis',
@@ -139,7 +139,7 @@ console.log('--- a gear earns its place by being reached, not by fitting the cha
    above it: the warning strip is for things that are wrong, and a gear you
    cannot reach is just a fact about the build. */
 r = at({ fdfit: 4.575, vgraph: 157, vmax: 141.5 });
-ok('knows which gear the car runs out in', r.topsIn === 6, r.topsIn);
+ok('at the fit every gear engages', r.topsIn === 7, r.topsIn);
 ok('no red warning for it', !r.w.join(' ').includes('never engage'));
 ok('drag, geared long, runs out lower down',
    at({ disc: 'drag', tire: 'dragt', fdfit: 4.575, vgraph: 157, vmax: 141.5 }).topsIn <= 6);
@@ -153,7 +153,7 @@ console.log('--- top gear\'s limiter is a ceiling, not a predicted top speed ---
    the car did 140.0, because by then the engine is past peak power. A previous
    revision printed the ceiling as the predicted top speed and was out by 11. */
 r = at({ fdfit: 4.575, vgraph: 159 });
-ok('exposes a ceiling', near(r.topCeil, 159 * 1.14, 1), r.topCeil.toFixed(1));
+ok('exposes a ceiling', near(r.topCeil, 159, 1), r.topCeil.toFixed(1));
 ok('a top speed under the ceiling is normal, not an error',
    !/does not add up/.test(at({ fdfit: 4.575, vgraph: 159, vmax: 140 }).w.join(' ')));
 ok('a top speed above the ceiling is impossible and flagged',
@@ -180,21 +180,32 @@ const words = h => { const g = h.indexOf('>Gearing</h3>'), n = h.indexOf('<div c
   return h.slice(g, n).replace(/<[^>]+>/g, ' ').split(/\s+/).filter(Boolean).length; };
 
 const full = draw({ fdfit: '4.58', vgraph: '157', vmax: '141.5' });
-ok('opens with the number to set', /<b>Set 4\.02<\/b>/.test(full));
-ok('shows the working', /4\.58 &divide; 1\.14/.test(full));
+ok('opens with the number to set', /<b>Set 4\.58<\/b>/.test(full));
+ok('shows the working', /4\.58 &divide; 1\.00/.test(full));
 ok('offers the sweep band', /sweep <b>3\.\d\d&ndash;4\.\d\d<\/b>/.test(full),
    (full.match(/sweep <b>[\d.]+&ndash;[\d.]+<\/b>/) || [])[0]);
 ok('hands the decision to the Performance panel', /let the Performance panel decide/.test(full));
 ok('marks where the car runs out', /tops out here, 142 mph/.test(gearBlock(full)));
-ok('marks the gear that never comes in', /never used/.test(gearBlock(full)));
-ok('does NOT print a speed the car cannot reach', !/179 mph/.test(gearBlock(full)),
+/* At the fit every gear engages — which is the whole reason road is 1.00.
+   Boston: "if 7th is never used why would you not adjust the gears so it is". */
+ok('at the fit nothing is marked unused', !/never used/.test(gearBlock(full)),
    gearBlock(full).replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim());
-ok('names the last usable gear', /<b>6th is your last usable gear\.<\/b>/.test(full));
-ok('points at the shorter box once, quietly', /a 6-speed would drive the same/.test(full));
-ok('the whole section stays short', words(full) < 160, words(full) + ' words');
+ok('and it says so', /Every gear comes in, and the car runs out in 7th/.test(full));
+ok('the whole section stays short', words(full) < 170, words(full) + ' words');
+
+// a car that runs out far below its gearing still gets the honest verdict
+const dead = draw({ fdfit: '4.58', vgraph: '157', vmax: '120' });
+ok('marks the gear that never comes in', /never used/.test(gearBlock(dead)));
+ok('does NOT print a speed the car cannot reach', !/157 mph/.test(gearBlock(dead)),
+   gearBlock(dead).replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim());
+ok('names the last usable gear', /<b>6th is your last usable gear\.<\/b>/.test(dead));
+ok('says gearing shorter is the first move', /Gearing shorter brings it in/.test(dead));
+ok('and the shorter box only as the fallback', /a 6-speed drives the same for less PI/.test(dead));
+ok('notes it costs PI, not lap time',
+   /final drive cannot change the rpm drop per shift/.test(dead));
 
 const noTop = draw({ fdfit: '4.58', vgraph: '157', vmax: '' });
-ok('without top speed it still lists limiter speeds', /to 179 mph/.test(gearBlock(noTop)));
+ok('without top speed it still lists limiter speeds', /to 157 mph/.test(gearBlock(noTop)));
 ok('and asks for the one number that would sharpen it',
    /Add <b>Top speed at that setting<\/b>/.test(noTop));
 ok('but claims nothing about which gears are used',
