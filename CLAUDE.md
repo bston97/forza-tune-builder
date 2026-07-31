@@ -216,6 +216,35 @@ there is nothing honest to compare against, since the axis sits ~13 mph above
 anything the car reaches; `compute()` says so and asks for the number rather
 than guessing.
 
+### Why there is no simulator, and what `sweep.test.js` does instead
+
+Asked 2026-07-31 whether the sweep data could be reverse-engineered into a
+model to test constants against before shipping them. Worth answering properly,
+because the instinct is right and the answer is split:
+
+**The gear-speed model was reverse-engineered and does hold.** `k/(FD·G)` is
+pure kinematics — no unknown physics — so it generalises to any car and checks
+out against both the graph (all seven gears within 2%) and an independent
+readout.
+
+**The performance figures cannot be.** Demonstrated on the data we have: at
+final drive 3.50 and 4.82 the engine sits at 7551 and 7516 rpm at top speed,
+0.5% apart, while the drag those speeds imply differs by 9.7%. One engine speed
+cannot make 10% more power, so either the derived constants are slightly off or
+the Top Speed readout is not a drag equilibrium. Six points on one car
+underdetermine it, and a fit would be *this car's* fit regardless — generalising
+would need the engine's power curve, which no screen exposes as numbers.
+
+And the game already is the simulator: the Performance panel returns exact
+figures for any setting in about a second. Rebuilding that badly is worse than
+telling the user which three numbers to read.
+
+So `sweep.test.js` holds the measured table as a **fixture**, not a model. Any
+future change to `vFrac` must still produce, for the reference car, a setting
+the game actually liked — top half of the measured six, never 4.82. That is the
+check that was missing when 0.95 and then 1.14 shipped untested against data
+already sitting in the repo.
+
 ### Searching for outside confirmation: don't bother
 
 Asked to check this against published sources 2026-07-31, the result was
