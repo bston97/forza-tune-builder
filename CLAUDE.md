@@ -126,6 +126,12 @@ is. Rough tiers, most to least trustworthy:
    graph and the `SPREAD` gear tables (confirmed 2026-07-31, see below).
 2. **Traceable FH6-specific source** — ForzaTune's guide, Game8, official
    patch notes. Diff accel bands, aero balance range, the drag-tire nerf.
+   Re-scanned 2026-08-01: ForzaTune's FH6 guide moved three of our values —
+   warm tire target 32-34 → the FH6 window of 30-40, road-family caster
+   6.7 → 6.5 (their band 5.5-6.5), AWD centre neutral base 55 → 60 (their
+   band 60-70). `scan.test.js` locks those and the deliberate deviations kept
+   against them (RWD decel stays low per Boston; aero balance 0.42-0.48 is
+   confirmed on his own screen; bump=0.63×rebound they corroborate).
 3. **Community-standard but FH4/FH5-era** (carried forward, not FH6-confirmed)
    — HokiHoshi's axle-share ARB/damper method, the bump=0.63×rebound
    convention, the spring frequency-vs-PI curve.

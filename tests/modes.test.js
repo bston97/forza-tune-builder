@@ -77,6 +77,55 @@ fill({});
 X.setMode('tune'); els['calc'].onclick(); X.setMode('sheet');
 ok('re-reads after a change', /4\.58 fit/.test(els['preflight'].innerHTML));
 
+console.log('--- Enter fires the mode\'s action, not always Calculate ---');
+/* In plan mode torque and front % are legitimately blank; Enter used to fire
+   Calculate anyway, and "Torque is required" replaced the plan on screen. */
+fill({ tq: '', fw: '' });
+X.setMode('plan');
+els['plan'].onclick();
+ok('plan renders without torque', /Build Plan/.test(els['out'].innerHTML));
+(function () {
+  // the shim registers document.addEventListener as a no-op, so call the
+  // behaviour through the buttons the handler would press instead:
+  // plan mode -> plan. The assertion is that calc alone would have failed.
+  els['calc'].onclick();
+  ok('Calculate with a blank torque fails as expected', /required/.test(els['out'].innerHTML));
+  els['plan'].onclick();
+  ok('plan comes back', /Build Plan/.test(els['out'].innerHTML));
+})();
+
+console.log('--- loads switch to the mode they belong to ---');
+fill({});
+X.setMode('tune'); els['calc'].onclick(); els['save'].onclick();   // library entry
+els['plan'].onclick();                                             // plan entry
+X.setMode('plan');
+const buildKey = encodeURIComponent(JSON.parse(localStorage.getItem('fh6lib'))[0].k);
+els['out'].fire('click', { target: { dataset: { load: buildKey } } });
+ok('loading a build switches to tune mode', X.MODE === 'tune', X.MODE);
+ok('and renders the tune', /Antiroll/.test(els['out'].innerHTML));
+X.setMode('tune');
+const pKey = encodeURIComponent(JSON.parse(localStorage.getItem('fh6plan'))[0].k);
+els['out'].fire('click', { target: { dataset: { load: 'p:' + pKey } } });
+ok('loading a starting point switches to plan mode', X.MODE === 'plan', X.MODE);
+
+console.log('--- the sheet follows a hand-edited final drive ---');
+/* sheet() used r.gearTop — speeds at compute()'s fd — under a header showing
+   eff('fd'). Edit the final drive, export, and the numbers described a setting
+   that was not on the sheet. */
+X.setMode('tune');
+fill({});
+els['calc'].onclick();
+els['out'].fire('change', { target: { dataset: { k: 'fd' }, value: '3.60' } });
+els['save'].onclick();
+const sh = blob.parts[0];
+ok('sheet shows the edited final drive', /final-drive-value">3\.60</.test(sh));
+ok('default-ratio speeds recomputed at it', /gear-mph">56</.test(sh) && /gear-mph">200</.test(sh));
+ok('not the stale speeds from the old fd', !/gear-mph">44</.test(sh));
+ok('computed ratio set printed too', /Computed ratios/.test(sh));
+ok('its top gear lands on the chart maximum', /gear-mph">157</.test(sh));
+ok('note explains the A/B', /Two gear tables are printed/.test(sh));
+ok('sheet clean', !/undefined|NaN|\{\{/.test(sh));
+
 console.log('--- no tune, no export ---');
 els['newcar'].onclick();
 X.setMode('sheet');
