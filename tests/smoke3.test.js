@@ -39,6 +39,27 @@ ok('shows hp/1000lb context', plan.indexOf('hp per 1000 lb') > -1);
 ok('adjust bar hidden on plan', els['adjust'].style.display === 'none');
 ok('VIEW = plan', X.VIEW === 'plan');
 
+console.log('\n--- power step gives a turbo-vs-internals decision rule ---');
+/* Boston asked "turbo or engine upgrades to raise the speed" — the honest
+   answer is neither by default, it is whichever wins hp-per-PI on the live
+   Buy & Install numbers, with a rule of thumb for how each tends to skew.
+   Also: an aspiration or cam change moves the redline, which moves the
+   gearing fit this app already handed back — worth flagging right where the
+   upgrade decision gets made, not left for the user to rediscover. */
+fill(Object.assign({}, EVO, { disc: 'road' })); els['plan'].onclick();
+const roadPlan = els['out'].innerHTML;
+ok('names the actual decision rule', /hp\/PI/.test(roadPlan) && /race exhaust and cams/i.test(roadPlan));
+ok('states how turbo skews the powerband', /top of the rev range/.test(roadPlan) && /lag/.test(roadPlan));
+ok('warns that the redline can move', /redline moves/.test(roadPlan) || /moves the redline/.test(roadPlan));
+ok('tells you what to do about it', /re-sweep the final drive/.test(roadPlan));
+
+fill(Object.assign({}, EVO, { disc: 'drag', dt: 'AWD' })); els['plan'].onclick();
+const dragPlan = els['out'].innerHTML;
+ok('drag still says power leads', /power leads here/.test(dragPlan));
+ok('drag gives its own turbo rationale', /matters far less on a prepped launch/.test(dragPlan));
+ok('drag still tells you to re-check the fit after an engine change',
+   /re-sweep it before trusting/.test(dragPlan));
+
 console.log('\n--- viability flags ---');
 function flagsFor(o) { fill(Object.assign({}, EVO, o)); els['plan'].onclick();
   return (els['out'].innerHTML.match(/class="flag"/g) || []).length; }

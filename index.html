@@ -661,7 +661,9 @@ function tarmacPath(i){
 
    {n:'Power', tag:'fill', pick:'Fill whatever PI is left, up to the class ceiling',
     why:'Power comes last because it is the easiest thing to add and the hardest to use. Once the chassis works, convert the remaining budget into power — and always build to the ceiling, since a throttle-limited car at 805 PI loses to a proper build at 800.',
-    watch:'Watch power-to-weight rather than peak HP, and notice where the power lands in the rev range — a peaky top-end build is harder to drive out of slow corners than the HP number suggests.'},
+    watch:'Watch power-to-weight rather than peak HP, and notice where the power lands in the rev range — a peaky top-end build is harder to drive out of slow corners than the HP number suggests.'+
+      ' <b>Turbo vs internals is not a fixed answer</b> &mdash; hover each part for its live PI and power-to-weight delta and buy whichever wins per point spent. As a rule of thumb: race exhaust and cams are usually the cheapest hp/PI on the list, buy those first regardless of what comes after. A turbo conversion is typically the single biggest jump available but the most PI-expensive, and it stacks power at the top of the rev range with more lag low down &mdash; a good trade with PI to spare, a bad one when squeezing the last points to a ceiling on a car that already struggles off slow corners. Naturally-aspirated internals (cams, valves, displacement) spread power more evenly and often raise the redline instead.'+
+      ' <b>If the redline moves</b> (a new turbo, cams, or a full engine swap), your gearing fit is now wrong for the new engine &mdash; re-sweep the final drive on the Gearing tab before trusting the old numbers.'},
 
    {n:'Aero', tag:aPlus?'high':'skip',
     pick:aPlus?'Adjustable front + rear if the car offers it':'Usually skip at this class',
@@ -710,7 +712,9 @@ function dragPath(i){
     unlock:'Tire pressure — the tune runs the rear soft and the front near the cap.'},
    {n:'Power', tag:'must', pick:'Maximum — power leads here',
     why:'This is the single exception to build-grip-first. In a straight line power is the product; everything else exists to deliver it.',
-    watch:'Power-to-weight is the number that matters. Keep buying until the class ceiling stops you.'},
+    watch:'Power-to-weight is the number that matters. Keep buying until the class ceiling stops you.'+
+      ' Turbo usually wins the hp/PI comparison here even though it costs more than internals: its power stacks at the top of the rev range, which is exactly where a run spends most of its time once rolling, and the extra lag off the line matters far less on a prepped launch than it does exiting a slow corner. Compare it against cams/internals on the live PI delta anyway &mdash; do not assume.'+
+      ' A turbo or cam swap moves the redline, which moves your gearing fit &mdash; re-sweep it before trusting the final drive this app already gave you.'},
    {n:'Transmission', tag:'must', pick:'Race transmission — 6 gears is the standard baseline, more only if the powerband needs the spread',
     why:'Ratio control is how you keep the engine in its band for the whole run. Very high-power builds can justify 8–10 gears; most do not need them, and each extra gear is PI plus a shift that costs time.',
     unlock:'Final drive, individual ratios, gear count.'},
