@@ -60,6 +60,24 @@ name because the answer decides which fields are worth showing:
 the live form rather than `BASE`, so it reflects edits made since the last
 calculate. `modes.test.js` covers the visibility matrix and the gap-flagging.
 
+**Tune mode walks three steps** (`setStep`, `STEP`): 1 the car (stats panel),
+2 what's fitted (upgrade list), 3 gearing readings (Gearing tab) — one
+physical screen per step. Every field stays in the DOM whichever step shows,
+so restore/save/tests see one flat form; only visibility moves. Step 1 blocks
+Next until the four required stats exist, with the refusal shown where the
+fields are rather than two steps later. The gearing block stopped being a
+`<details>` — a collapsed disclosure is how the 3.73 disaster shipped, and a
+dedicated step cannot be scrolled past. Enter advances the step; on step 3 it
+calculates. `newcar` returns to step 1, Find/Library loads land on step 3.
+
+**The results end with a "Verify In Game" section** — the in-game half of the
+process as one ordered list (enter values top-to-bottom, Mechanical Balance
+0.55–0.65, Aero Balance 0.42–0.48 when fitted, gearing, then drive and come
+back to the fine-tune box). The formulas get close; the readouts catch what
+the numbers cannot carry — track width, cage stiffness, the power curve. A
+car with widened tires additionally gets a line on the ARB note saying the
+readout sees the wider track and the formula does not, so trust the readout.
+
 ## Architecture
 
 Everything lives in `index.html`: styles, the tune-calculation engine

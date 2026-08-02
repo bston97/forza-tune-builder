@@ -129,7 +129,7 @@ console.log('--- what top speed is for, now that its meaning is unsettled ---');
      /Which of them you actually reach is a question this cannot answer/.test(
        draw({ fdfit: '4.58', vgraph: '157', vmax: '141.5' })));
   ok('the form no longer asks for top speed at all',
-     !/id="vmax"/.test(HTML) && /no\s+longer asks for Top Speed/.test(HTML));
+     !/id="vmax"/.test(HTML) && /Top Speed is never\s+asked for/.test(HTML));
 
   ok('the fit alone gives nothing', at({ fdfit: 4.575 }).gearTop === null);
   ok('graph max alone gives nothing', at({ vgraph: 157 }).gearTop === null);
@@ -301,5 +301,5 @@ ok('New car clears it', els['fdfit'].value === '');
 console.log('--- the gearing block is not hidden any more ---');
 const fs = require('fs'), path = require('path');
 const html = fs.readFileSync(path.join(__dirname, '..', 'index.html'), 'utf8');
-ok('details block opens by default', /<details id="extra" open>/.test(html));
+ok('gearing has its own step, no disclosure to miss', /<div id="extra">/.test(html) && !/<details id="extra"/.test(html));
 ok('the fit field is inside it', /id="fdfit"/.test(html));

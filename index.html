@@ -86,6 +86,16 @@
   .modes button:disabled{opacity:.4;cursor:not-allowed}
   .modes button:disabled:hover{color:var(--dim);border-color:var(--line)}
 
+  /* Step header for the tune walk-through. */
+  .stephead{display:flex;align-items:baseline;gap:9px;margin:2px 0 6px;
+        padding-bottom:7px;border-bottom:1px solid var(--line)}
+  .stephead .n{font:700 11px/18px ui-monospace,Consolas,monospace;color:var(--acc);
+        letter-spacing:.4px;white-space:nowrap}
+  .stephead .t{font-size:13px;font-weight:600}
+  .stephead .d{font-size:11px;color:var(--dim);margin-left:auto;text-align:right}
+  #next{background:var(--acc);color:#06121f}
+  #next:hover{background:#6bb4ff}
+
   /* Pre-flight: everything that lands on the sheet, checked before export. */
   .pf{display:grid;gap:5px;margin:2px 0 4px}
   .pf .r{display:grid;grid-template-columns:16px 1fr auto;gap:8px;align-items:baseline;
@@ -255,6 +265,14 @@
       <div id="preflight" style="display:none"></div>
 
       <div id="formfields">
+      <!-- Tune mode walks these in three steps, one screen's worth of numbers
+           per step, matching where you physically are: at the stats panel, at
+           the upgrade list, at the Gearing tab. Every field stays in the DOM
+           whichever step is showing, so restore/save/tests see one flat form. -->
+      <div class="stephead" id="stephead" style="display:none"></div>
+      <div class="hint" id="stephint" style="display:none;color:#ff8787"></div>
+
+      <div id="step1">
 <!-- Grouped by WHERE the numbers come from, in the order you'd hit the screens:
      no screen at all -> one stats panel -> the tuning menu you're about to open anyway. -->
       <h2 style="display:flex;justify-content:space-between;align-items:center">Build target
@@ -305,8 +323,10 @@
       </div>
       <div class="hint" style="margin-top:6px">PI is the big number on the same panel. Enter it and
         the Build Plan works out how much budget you have left to the class ceiling.</div>
+      </div><!-- /#step1 -->
 
       <div id="fitted">
+      <div id="parts">
       <h2 style="margin-top:16px">What's fitted <span class="hint">— defaults follow class &amp; event</span></h2>
       <div class="row2">
         <div><label>Tire compound</label>
@@ -389,49 +409,46 @@
         show on the Tires tab; gear count is the number in the transmission's name. Width is only
         read as a <b>difference</b> &mdash; it shifts brake bias toward the wider axle &mdash; so
         0/0 and +3/+3 give an identical tune. Set them equal unless the axles really differ.</div>
+      </div><!-- /#parts -->
 
-      <details id="extra" open>
-        <summary>Gearing &mdash; one number off the Gearing tab</summary>
-        <div class="hint" style="margin-bottom:2px">Three readings off the Gearing tab, each doing a
-          different job: <b>fit</b> and <b>graph max</b> multiply together into this car's speed
-          constant &mdash; neither works without the other &mdash; and <b>top speed</b> is what top
-          gear gets aimed at. With all three you can set any final drive you like and get ratios
-          that fit it.<br><br>For the fit: raise the final drive until the <b>top gear's line
-          finishes in the top-right corner</b>, meeting the rev-limiter line at the same moment it
-          reaches the right-hand edge.</div>
+      <div id="extra">
+        <h2 style="margin-top:4px">Gearing readings <span class="hint">&mdash; one trip to the Gearing tab</span></h2>
+        <div class="hint" style="margin-bottom:8px">Two chart readings. They multiply together into this car's speed
+          constant &mdash; neither works without the other &mdash; and from them the app can put
+          real mph on every gear at any final drive you choose.
+          <br><br><b>1.</b> On the Gearing tab, sweep the Final Drive slider until the <b>top
+          gear's line finishes in the top-right corner</b> of the speed graph &mdash; still
+          climbing as it reaches the right-hand edge, meeting the rev-limiter line exactly there.
+          Enter that slider value as the <b>fit</b>.
+          <br><b>2.</b> Read the number under the right-hand end of the bottom axis. It never
+          moves. That is <b>Graph max</b>.
+          <br><b>3.</b> Optional: if you want to run your own final drive rather than the app's,
+          enter it too &mdash; every gear figure is then worked out at <em>your</em> setting, with
+          ratios to match.</div>
         <div class="row2">
-          <div><label>Final drive where top gear just fits</label>
+          <div><label>1 &middot; Final drive where top gear just fits</label>
             <input id="fdfit" type="number" inputmode="decimal" step="0.01" placeholder="4.58"></div>
-          <div><label>Graph max (mph) <span class="hint">opt.</span></label>
+          <div><label>2 &middot; Graph max (mph)</label>
             <input id="vgraph" type="number" inputmode="decimal" placeholder="159"></div>
         </div>
-        <div class="hint" style="margin-top:8px"><b>Careful here:</b> a line cut off <em>by</em> the
-          edge touches it too, so "reaches the edge" is not the test. Watch where the line stops
-          climbing. Too tall and it is still rising when the edge chops it off &mdash; or it has
-          vanished entirely. Too short and it flattens onto the limiter well before the edge. You
-          want the corner: still climbing right up to the edge, arriving at the limiter exactly
-          there. Leave the individual ratios alone throughout &mdash; only the top one affects this,
-          and it is the game's own value.<br><br><b>Graph max</b> is the number under the right-hand
-          end of that axis. It never moves, and adding it makes the gear list below show the speed
-          every gear runs out at.</div>
-
-        <div style="border-top:1px solid var(--line);margin-top:12px;padding-top:8px">
-          <label>Final drive you run <span class="hint">opt.</span></label>
-          <input id="fdset" type="number" inputmode="decimal" step="0.01" placeholder="4.58">
-          <div class="hint" style="margin-top:8px">Set whatever final drive you like in game and
-            enter it &mdash; every gear figure below is then worked out at <em>your</em> setting
-            rather than at a suggestion, and you get ratios to match it.<br><br><b>The app no
-            longer asks for Top Speed.</b> That figure is the maximum the car would do with the
-            whole build and tune aimed at speed &mdash; aero and all &mdash; so on a downforce
-            build it is far above anything you will see, and nothing here can safely be measured
-            against it. Everything now comes off the two chart readings above, which mean one
-            thing only.</div>
-        </div>
-      </details>
+        <label style="margin-top:9px">3 &middot; Final drive you run <span class="hint">opt.</span></label>
+        <input id="fdset" type="number" inputmode="decimal" step="0.01" placeholder="4.58">
+        <div class="hint" style="margin-top:8px"><b>The corner test, precisely:</b> a line cut off
+          <em>by</em> the edge touches it too, so "reaches the edge" is not enough. Too tall and
+          the line is still rising when the edge chops it off &mdash; or it has vanished. Too
+          short and it flattens onto the limiter well before the edge. You want it arriving at
+          both at once. Leave the individual ratios alone while you sweep &mdash; only the top one
+          affects this.<br><br>Skip this step entirely and the final drive is a power-to-weight
+          guess with no gear speeds &mdash; it still calculates, but the gearing section will say
+          so. (The Performance panel's Top Speed is never asked for: that figure assumes the whole
+          build is aimed at speed, aero and all, so nothing can safely be measured against it.)</div>
+      </div><!-- /#extra -->
       </div><!-- /#fitted -->
       </div><!-- /#formfields -->
 
       <div class="btns">
+        <button id="back" class="alt" style="display:none">&larr; Back</button>
+        <button id="next" style="display:none">Next &rarr;</button>
         <button id="plan" class="alt">Build Plan</button>
         <button id="calc">Calculate</button>
         <button id="save" disabled>Create Tune Sheet</button>
@@ -1347,7 +1364,10 @@ function render(){
       ? 'Race anti-roll bars are what expose these sliders. They are cheap in PI and are the main tool for setting balance, so this is usually the first thing to fix.'
       : 'Split proportional to axle load (stiffer bar on the heavier axle = neutral roll stiffness), then trimmed toward rotation.'+
         (eff('arF')==null||eff('arR')==null ? ' <b>Only one bar is fitted</b>, so balance here is half-blind &mdash; the difference between the two is what actually sets it.' :
-        ' <b>Check Mechanical Balance on this same tab &mdash; target 0.55&ndash;0.65, sweet spot 0.60.</b> Below 0.55 understeers, above 0.65 goes unstable. Adjust before you leave the tab: soften the end with the problem rather than stiffening the strong end, roughly &plusmn;0.5 ARB per 1% of shift.')));
+        ' <b>Check Mechanical Balance on this same tab &mdash; target 0.55&ndash;0.65, sweet spot 0.60.</b> Below 0.55 understeers, above 0.65 goes unstable. Adjust before you leave the tab: soften the end with the problem rather than stiffening the strong end, roughly &plusmn;0.5 ARB per 1% of shift.'+
+        ((i.twf>0||i.twr>0)
+          ? ' <b>Widened car:</b> a wider track stiffens roll beyond what these numbers assume &mdash; the readout sees that, the formula does not, so if it lands outside the band that gap is the width. Trust the readout.'
+          : ''))));
 
   const noSpring=locked('spF','spR','rhF','rhR');
   R.push(sec('var(--spring)','Springs',
@@ -1414,6 +1434,21 @@ function render(){
           : '')+
         'Accel scaled to torque and weight &mdash; higher torque needs less lock for the same rotation, and a lighter car rotates more on the same value.'+
         (noDecel?'':' <b>Decel deliberately kept low</b>; raise it only from real handling feedback, never as a stability buffer.')));
+
+  /* The in-game half of the process, spelled out in order instead of scattered
+     through the section notes above. The formulas get the numbers close; these
+     readouts and checks are what catch everything the numbers cannot carry —
+     track width, cage stiffness, the actual power curve. */
+  R.push(sec('var(--acc)','Verify In Game',[['&mdash;','5 checks, in order']],
+    '<b>1 &middot; Enter everything above, top to bottom</b> &mdash; the sections are already in the game\'s tab order.'+
+    '<br><b>2 &middot; Antiroll tab:</b> Mechanical Balance reads <b>0.55&ndash;0.65</b>, sweet spot 0.60. Off the band &rarr; soften the problem end, about &plusmn;0.5 ARB per 1% of shift.'+
+    ((eff('aeF')!=null&&eff('aeR')!=null)
+      ? '<br><b>3 &middot; Aero tab:</b> Aero Balance reads <b>0.42&ndash;0.48</b>, sweet spot 0.45 &mdash; move the rear wing, not the front.'
+      : '<br><b>3 &middot; Aero tab:</b> nothing to check on this build.')+
+    '<br><b>4 &middot; Gearing tab:</b> final drive as set above'+
+    (r.fdSrc==='rough'?' &mdash; <b>except it is currently a guess</b>: do the corner sweep from step 3 first':'')+
+    '. If you took the computed ratios, they go in here too.'+
+    '<br><b>5 &middot; Drive two or three laps:</b> warm tires low-to-mid 30s psi, Springs telemetry staying under ~97%, and the car just reaching its last usable gear on the longest straight. Then come back and tell the fine-tune box what it actually did.'));
 
   const nMod=Object.keys(ADJ).length;
   const hd='<div class="panel" style="margin-bottom:9px"><div class="hd">'+
@@ -2357,7 +2392,7 @@ function applyFields(r){
    build, with the wrong action buttons showing. */
 function loadBuild(key){
   const r=libLoad().find(x=>x.k===key); if(!r) return false;
-  applyFields(r); setMode('tune'); document.getElementById('calc').click(); return true;
+  applyFields(r); setMode('tune'); setStep(3); document.getElementById('calc').click(); return true;
 }
 function loadPlan(key){
   const r=planLoad().find(x=>x.k===key); if(!r) return false;
@@ -2474,21 +2509,70 @@ const MODEHINT={
   tune :'Post-upgrade. The full stat block, the parts actually on the car, and the gearing readings.',
   sheet:'Last look before the sheet is made. Check what is missing, then create it.'
 };
+const show=(id,on)=>{ const el=document.getElementById(id); if(el) el.style.display=on?'':'none'; };
+
 function setMode(m){
   MODE=m;
   document.querySelectorAll('#modes button').forEach(b=>{
     b.className = b.dataset.mode===m ? 'on' : '';
   });
   document.getElementById('modehint').innerHTML=MODEHINT[m];
-  const show=(id,on)=>{ const el=document.getElementById(id); if(el) el.style.display=on?'':'none'; };
   show('formfields', m!=='sheet');
   show('preflight',  m==='sheet');
-  show('fitted',     m==='tune');       // meaningless before anything is bought
   show('plan',       m==='plan');
-  show('calc',       m==='tune');
   show('save',       m==='sheet');
+  if(m==='tune'){ setStep(STEP); }
+  else{
+    // plan shows only the pre-purchase step; sheet shows no form at all
+    show('fitted', false); show('step1', m==='plan');
+    show('stephead', false); show('stephint', false);
+    show('back', false); show('next', false); show('calc', false);
+  }
   if(m==='sheet') renderPreflight();
 }
+
+/* ===================== TUNE STEPS =====================
+   One screen's worth of numbers per step, matching where you physically are:
+   1 at the car's stats panel, 2 at the upgrade list, 3 at the Gearing tab.
+   The whole form used to show at once, and the two fields that matter most —
+   the gearing readings — were the ones people scrolled past. */
+let STEP=1;
+const STEPS={
+  1:{t:'The car',        d:'everything off the stats panel'},
+  2:{t:'What\'s fitted', d:'the parts actually on the car'},
+  3:{t:'Gearing readings', d:'one trip to the Gearing tab'}
+};
+function setStep(n){
+  STEP=n;
+  show('step1',  n===1);
+  show('parts',  n===2);
+  show('fitted', n>=2);                 // #parts and #extra both live inside it
+  show('extra',  n===3);
+  show('stephead', true);
+  show('back', n>1);
+  show('next', n<3);
+  show('calc', n===3);
+  show('stephint', false);
+  document.getElementById('stephead').innerHTML=
+    '<span class="n">STEP '+n+' / 3</span><span class="t">'+STEPS[n].t+
+    '</span><span class="d">'+STEPS[n].d+'</span>';
+}
+/* Step 1 must be complete before moving on — the same four numbers Calculate
+   itself refuses without. Checked here so the refusal happens where the
+   fields are, not two steps later. */
+function stepValid(){
+  if(STEP!==1) return true;
+  const bad=[['wt','Weight'],['fw','Front %'],['hp','HP'],['tq','Torque']]
+    .filter(([id])=>{ const v=parseFloat(document.getElementById(id).value); return !isFinite(v)||v<=0; })
+    .map(([,l])=>l);
+  if(!bad.length) return true;
+  const el=document.getElementById('stephint');
+  el.innerHTML='Still needed before the next step: <b>'+bad.join(', ')+'</b> &mdash; all four are on the car\'s stats panel.';
+  el.style.display='';
+  return false;
+}
+document.getElementById('next').onclick=()=>{ if(stepValid()) setStep(Math.min(3,STEP+1)); };
+document.getElementById('back').onclick=()=>{ setStep(Math.max(1,STEP-1)); };
 
 /* What the sheet is about to say, and what it cannot say because it was never
    entered. Nothing here blocks the export — a sheet with a missing year is
@@ -2597,6 +2681,7 @@ document.getElementById('lib').onclick=()=>{
    the next car's brake balance and "exact" final drive. Class, event and the
    visible dropdowns stay: they're the context you're building in. */
 document.getElementById('newcar').onclick=()=>{
+  if(MODE==='tune') setStep(1);              // a fresh car starts the walk over
   ['name','year','wt','fw','hp','tq','pi','fdfit','vgraph','fdset']
     .forEach(id=>{ document.getElementById(id).value=''; });
   document.getElementById('twf').value='0'; document.getElementById('twr').value='0';
@@ -2693,7 +2778,11 @@ document.addEventListener('keydown',e=>{
      replaced the plan on screen with "Torque is required". */
   if(e.key==='Enter'&&e.target.tagName!=='BUTTON'&&!(e.target.dataset&&e.target.dataset.k)){
     if(MODE==='plan') document.getElementById('plan').click();
-    else if(MODE==='tune') document.getElementById('calc').click();
+    else if(MODE==='tune'){
+      // Enter walks the steps; on the last one it calculates
+      if(STEP<3) document.getElementById('next').onclick();
+      else document.getElementById('calc').click();
+    }
     // sheet mode: Enter does nothing — the only action there is the export
   }
 });
