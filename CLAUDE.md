@@ -1,20 +1,26 @@
-# Tune Goon
+# Forza Tune Goon
 
 A Forza Horizon 6 tuning calculator: enter a car's stat block, get a full tune,
 fix what the car actually did on track, plan the upgrade path, and export a
 sheet. Single self-contained `index.html` — no server, no build step, no
 dependencies. Deployed via GitHub Pages, auto-publishing from `main` on every
 push (usually live within a couple of minutes; verify with
-`gh api repos/bston97/tune-goon/pages/builds/latest --jq .status`).
+`gh api repos/bston97/forza-tune-goon/pages/builds/latest --jq .status`).
 
-Live at **https://bston97.github.io/tune-goon/**.
+Live at **https://bston97.github.io/forza-tune-goon/**.
 
-**The project is Tune Goon; the page heading is not.** The repo, URL, PWA name
-and docs all say Tune Goon, but the `<h1>` still reads "FH6 Tune Builder" and
-the exported sheet still says "Forza Horizon 6 · Tune Sheet" — that is
-deliberate, asked for directly, not something left half-renamed. The local
-working directory is still `Forza Tune Builder`; renaming it is safe but has to
-happen outside a session, since it is the cwd.
+**The project is Forza Tune Goon; the page heading is not.** The repo, URL, PWA
+name and docs all say Forza Tune Goon, but the `<h1>` still reads "FH6 Tune
+Builder" and the exported sheet still says "Forza Horizon 6 · Tune Sheet" —
+that is deliberate, asked for directly, not something left half-renamed. The
+local working directory is still `Forza Tune Builder`; renaming it is safe but
+has to happen outside a session, since it is the cwd.
+
+Renamed from **Tune Goon** on 2026-08-08 (repo slug `tune-goon` →
+`forza-tune-goon`, so the Pages URL moved with it). GitHub redirects the old
+repo path indefinitely and the old Pages URL for a while, but nothing should
+rely on either — if you find a surviving `tune-goon` reference, it is a miss,
+not a deliberate exception.
 
 ## Before changing anything
 

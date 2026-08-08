@@ -1,10 +1,10 @@
-# Tune Goon
+# Forza Tune Goon
 
 A single-file tuning calculator for Forza Horizon 6. Enter a car's stat block, get a
 complete tune in Forza tuning-menu order, fix what the car actually did on track, and
 export a sheet.
 
-Live at **https://bston97.github.io/tune-goon/** — installable to a phone home screen and
+Live at **https://bston97.github.io/forza-tune-goon/** — installable to a phone home screen and
 works offline once loaded.
 
 No server, no build step, no dependencies — open `index.html` in a browser.

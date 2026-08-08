@@ -2,7 +2,7 @@
 
 This is the repo's to-do list. It is tracked and pushed like everything else
 (it was briefly gitignored on 2026-08-08 and that was reversed the same day —
-a to-do list that only exists on one machine is not a to-do list). Five items,
+a to-do list that only exists on one machine is not a to-do list). Six items,
 each with a plan detailed enough to start from cold. Nothing here has been
 implemented.
 
@@ -16,7 +16,10 @@ menu, and they turn two of the biggest house-heuristic guesses into measured
 functions. D (discipline naming) next, because it is small and it changes the
 vocabulary every other plan is written in. Then B (generative test set),
 because it needs A's fixtures to be more than a structural check. C (GitHub
-files) is independent and can be done any time.
+files) is independent and can be done any time. F is library housekeeping
+rather than code and needs Boston at the wheel, so it runs on its own clock —
+though the shape of what it needs from the app (see F3) is worth knowing before
+D lands, since both touch how a build is keyed.
 
 ---
 
@@ -646,3 +649,84 @@ it is safe but has to happen outside a session, since it is the cwd." The
 actual path is now `C:\Users\bston\Projects\forza-tune-goon`, so the rename
 already happened and the caveat describes work that is done. Delete the
 sentence. Bundle it with E1 — both are one-line staleness in the same file.
+
+---
+
+# F. Library cull, then two tunes per keeper
+
+Asked for 2026-08-08, recorded as a note only — **nothing here has been
+started, and the shape below is one reading of a one-line request, not a
+settled spec.** Read F0 before acting on any of it.
+
+## F0 — What was actually said
+
+> "Go through all duplicates and get rid of ones I don't want and create 2
+> different tunes for each we actually like."
+
+Two jobs, in order: **cull, then double up.** Everything past this heading is
+inference about what "duplicates" and "2 different tunes" mean against how the
+stores are actually keyed. Confirm the two open questions in F4 with Boston
+before deleting anything — a delete here is unrecoverable (localStorage, one
+device, no backup, no undo).
+
+## F1 — Why there are duplicates at all
+
+`libKey` is `name|year|class|discipline` (`index.html:921`) and `planKey` is
+`name|year` (`index.html:941`). Re-saving an exact match overwrites, so the
+store cannot hold a true duplicate. Everything Boston is seeing as a duplicate
+is therefore one of four things, and they want opposite treatment:
+
+1. **Name-variant collisions** — "GR86" vs "Toyota GR86" vs "toyota gr86 " are
+   three keys for one car (the key lowercases and trims but does not normalise
+   anything else). These are junk. Merge to whichever name he actually types
+   now, delete the rest.
+2. **Year variants** — same car saved once with the year and once without;
+   `year` is optional and empty-string is a distinct key. Junk, same treatment.
+3. **Same car, different class** — a genuine record of two builds, not a
+   duplicate. Keep unless he says otherwise.
+4. **Same car, different discipline** — likewise genuine, and note that D
+   (discipline naming) is going to rewrite these keys anyway. **Do F before D
+   or after D, never across it** — culling against key names that are about to
+   change wastes the pass.
+
+So the cull is really a *normalisation* pass over 1 and 2 plus a keep/drop
+judgement on 3 and 4.
+
+## F2 — "Two different tunes for each we actually like"
+
+Best reading: for each car that survives the cull, have two saved builds that
+are meaningfully different, not two copies with a slider moved. The natural
+axis is the one the key already carries — **discipline** (e.g. a road build and
+a circuit build), which the app is already set up to hold side by side and
+which the build plan already reads as reference points. Second candidate axis
+is **class** (e.g. an A build and an S1 build of the same car). Needs Boston to
+pick; see F4.
+
+Note what this is *not*: it is not two variants of one tune, because
+`libKey` has no slot for a variant name — saving a second setup in the same
+car+year+class+discipline overwrites the first. If that is what he wants, this
+stops being a data-entry task and becomes a schema change (a `variant` field in
+the key, plus migration for every existing entry, plus `find.test.js` and
+`planyear.test.js` updates). Do not start that on a guess.
+
+## F3 — One real gap the cull will hit immediately
+
+**`fh6plan` entries cannot be deleted from the UI.** Library builds have a
+two-tap Delete (`index.html:1638`, handler at `:2743`); starting-point entries
+have no delete path at all — they are written by Build Plan, surfaced by Find,
+and then permanent. A cull that can only remove half the store is not a cull.
+
+Fix before starting: give plan rows the same two-tap Delete, addressed by
+`planKey`, filtering `planLoad()` and calling `planStore()` — a near-copy of
+the existing library handler. `find.test.js` covers the Find list that renders
+both, so extend it there. Small, and it is the only code this whole item needs
+under the F2 reading above.
+
+## F4 — Open questions, blocking
+
+1. **Which axis are the two tunes?** Discipline, class, or something the key
+   does not currently hold (which would make this a schema change, see F2).
+2. **Do same-car-different-class/discipline entries count as duplicates to
+   cull, or as the keepers?** F1 assumes keepers. If he means the opposite, the
+   cull is much larger and F2's "two tunes" is rebuilding what was just
+   deleted — which would be worth catching before, not after.
