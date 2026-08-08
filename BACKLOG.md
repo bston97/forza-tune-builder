@@ -638,3 +638,11 @@ Note for whoever settles it: the axis is described as a fixed property of the
 car, but it is not established whether power upgrades move it. If the two
 readings were taken at different build states, both could be right and the real
 defect is that neither records the build. A4 should check that too.
+
+### E3 — CLAUDE.md says the working directory has not been renamed. It has.
+
+Line 16: "The local working directory is still `Forza Tune Builder`; renaming
+it is safe but has to happen outside a session, since it is the cwd." The
+actual path is now `C:\Users\bston\Projects\forza-tune-goon`, so the rename
+already happened and the caveat describes work that is done. Delete the
+sentence. Bundle it with E1 — both are one-line staleness in the same file.
