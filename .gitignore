@@ -1,1 +1,5 @@
 node_modules/
+
+# Local planning notes — not part of the shipped project. Note this means it
+# does not sync anywhere; move it into the repo if that stops being fine.
+BACKLOG.md
