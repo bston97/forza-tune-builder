@@ -9,8 +9,21 @@ implemented.
 Baseline as of 2026-08-08: `node tests/run.js` → **532 passed, 0 failed**
 across sixteen files.
 
-**Suggested order.** E first — it is two small documentation fixes and one of
-them is a genuine contradiction in the test data. Then A1 (gating matrix) and
+**Every section was checked against the code on 2026-08-08** and each now ends
+with a "Checked against the code" block: corrections where the plan described
+something the code does not do, and the file:line hooks each session actually
+touches. Read that block before the plan above it — in three sections it
+changes what the work is (A1's part list does not fit the form, D's migration
+hazard is worse than described, C's open question is answered). The blocks are
+code-reading only; nothing in them was verified against the game.
+
+**Suggested order.** E first, and the code check hardened the reason: it is
+small documentation work, but two of its four items are now prerequisites
+rather than tidying. **E4 before A1** — it decides whether A1 is confirming a
+source or replacing a guess. **E2 before A3** — A3 rewrites the `SPREAD` table,
+and one of the two gearing tests reads its constant from that table while the
+other hardcodes it, so today's 1.3% disagreement would turn into a moving one.
+Then A1 (gating matrix) and
 A2 (Mechanical/Aero Balance sweep) — cheap, done standing still in the tuning
 menu, and they turn two of the biggest house-heuristic guesses into measured
 functions. D (discipline naming) next, because it is small and it changes the
@@ -247,6 +260,61 @@ dead on a representative car is wrong regardless of lap time.
 One `varied` key per file. If two things moved, it is two files or it is
 nothing.
 
+## Checked against the code, 2026-08-08
+
+**1. The gate A1 is testing is `index.html:1215–1224`, and it is nine lines.**
+Worth reading before the screen check so the reading maps onto something:
+
+```
+const S=i.susp||'race', full=['race','rally','offroad'].includes(S);
+if(S==='stock'){ ['spF','spR','rhF','rhR'].forEach(k=>raw[k]=null); }
+if(!full){ ['reF','reR','buF','buR','camF','camR','toeF','toeR','cast'].forEach(k=>raw[k]=null); }
+```
+
+So street/sport keep springs and ride height and lose damping *and* alignment —
+including caster, which is the part most likely to be wrong, since caster is not
+obviously a suspension-tier unlock. Diff gating is `:1041–1042`. Both of A1's
+"most likely wrong" claims are one `if` each; the edit, once measured, is small.
+
+**2. A1's part list does not fit the form, and that is the bigger half of the
+job.** The procedure says to cover suspension, ARB and transmission across
+stock/street/sport/race. The form does not have those options:
+
+- Transmission (`index.html:385–388`) offers **stock/sport/race**, with Stock
+  and Street collapsed into one option labelled "Stock / Street". If the screen
+  check finds Street unlocks something Stock does not, this needs a fourth
+  option and a new gate branch, not a one-line change.
+- Anti-roll bars offer **stock / Race front only / Race rear only / Race both**
+  — there is no street or sport ARB tier in the form at all. If those tiers
+  exist in FH6 and gate differently, the same applies.
+
+Neither is hard, but "20 minutes, no driving" covers the *reading*. Budget the
+edit separately.
+
+**3. A2's ride-height sweep is in percent, not millimetres.** `VMETA.rhF/rhR`
+are `% of range`, `lo:0 hi:100` (`index.html:553–554`). The app never knows the
+car's real ride-height range, so record the percentage the slider was set to
+*and* whatever absolute figure the game shows beside it, or the rows will not
+generalise to a second car.
+
+**4. A3 will move one test and not the other.** `sweep.test.js` derives its
+speed constant from the app's own table — `const K = AXIS * FIT * X.SPREAD[7][6]`
+(`:78`, `:91`) — while `gearing.test.js:177` hardcodes `159 * 4.575 * 0.82`.
+Replacing the `SPREAD` rows (`index.html:527–535`) therefore silently moves
+`sweep.test.js`'s constant and leaves `gearing.test.js`'s where it is. Settle E2
+first; it is the same defect and it makes A3 safe.
+
+**5. A3's row 7 is the only measured one, and the other six are visibly
+interpolated.** Reading `SPREAD` down the column, the tables are smooth in a way
+real race boxes are not — 4 through 10 look generated from a curve, with 7
+swapped in when it was measured. Treat all six as unmeasured, not as
+approximations that might be close.
+
+**6. A7 has its fields already.** `VMETA.bal` is `% front, lo:30 hi:70` and
+`VMETA.pres` is `%, lo:50 hi:150` (`:561–562`), so the 5×3 sweep grid maps
+straight onto legal values. The heuristic it is testing is brake-bias-per-
+width-step, which is `wStep`-driven and nothing else — see B's brake invariant.
+
 ---
 
 # B. "Works for any car" — the generative test plan
@@ -437,6 +505,49 @@ Keep the default suite under ~10 seconds — `FUZZ=250` by default, `FUZZ=20000`
 for a deep run before a release. `run.js` needs no change beyond passing the
 env through; it already aggregates whatever each file prints.
 
+## Checked against the code, 2026-08-08
+
+**1. Front % is not clamped, it is rejected.** Layer 0 lists "20, 80 (the
+form's own clamp)" as adversarial edges. There is no clamp — `index.html:2474`
+*refuses to compute at all* outside 20–80 and returns null with a message. So a
+generated `fw` of 19 exercises the validator and never reaches `compute()`. Two
+consequences: the generator must call `compute()` directly rather than through
+the read-and-validate path if it wants out-of-range coverage, and 20 and 80
+themselves are the interesting cases because they are inclusive-passing
+boundaries.
+
+**2. Build the generator's field list from `FIELDS` (`index.html:2312`), not by
+hand.** It is the list both stores and the restore path already iterate. A
+hand-written domain table silently stops covering a field the moment one is
+added, which is exactly the failure this plan exists to prevent.
+
+**3. Three layer-1 invariants are confirmed as written; do not soften them.**
+`wStep = twr − twf` is the only thing brake balance responds to, so layer 1's
+"0/0 must equal 3/3 exactly" holds by construction and is worth asserting
+precisely because it looks like a bug. Drag's `pF=50, pR=15` is a hard override
+at `index.html:1000` and both values sit inside `VMETA` lo/hi, so they survive
+snapping unchanged. The stated ranges match `VMETA` exactly: springs 20–3,000,
+pressures 10–55, damping ceiling 20.
+
+**4. One layer-1 invariant is close to a tautology.** "Every non-null output
+lands on the `s` grid" is enforced centrally in one line — `v[k] = raw[k]==null
+? null : snap(k, raw[k])` (`:1227`) — so over generated *inputs* it re-tests
+`snap()` and little else. The version with teeth is the one `arb.test.js`
+already does: the grid surviving the **fix-delta** path, where multiplicative
+deltas stack. Point the generated cars at `applyDeltas()`, not just `compute()`.
+
+**5. Layer 0's `gr` domain is right and needs no edge cases.** The form offers
+exactly 4–10 (`index.html:391–394`) and `SPREAD` has exactly those seven keys,
+so there is no out-of-range gear count reachable. Stratify across all seven —
+skip the adversarial column here.
+
+**6. Layer 3 has a `null` trap.** Golden snapshots must preserve the difference
+between `null` (not adjustable on this build) and `0`. `JSON.stringify` keeps
+`null`, so this works by default — but any "tidy up the snapshot" pass that
+strips nulls or coerces them to `0`/`""` destroys exactly what `locked.test.js`
+exists to protect. Say so at the top of the golden file alongside the
+drift-detector warning.
+
 ---
 
 # C. GitHub suggested files
@@ -507,6 +618,38 @@ that is the legacy branch-based deploy or a workflow; if a test workflow is
 added, it is worth knowing whether a red build can still publish. It can, on
 branch-based deploys — which may be fine (a broken page beats a stale one is
 arguable either way) but should be a decision rather than a surprise.
+
+## Checked against the code, 2026-08-08
+
+**1. The open question above is answered: it is the branch-based deploy.**
+There is no `.github/` directory in the repo at all, so there is no workflow
+for Pages to be running. A red test workflow will therefore **not** block
+publication — the two are unrelated pipelines. Still worth a five-second look
+at Settings → Pages to confirm the source reads "Deploy from a branch", but the
+absence of any workflow file settles it in practice. If blocking is wanted, the
+deploy has to move to a Pages *workflow* with the test job as a dependency,
+which is a bigger change than the ten-line CI file described above and should
+be its own decision.
+
+**2. Every "worth doing" file is genuinely absent.** Confirmed by listing: no
+`LICENSE`, no `.github/` (so no workflows, no issue templates, no PR template),
+no `.gitattributes`, no `.editorconfig`. `package.json` still says
+`"license": "UNLICENSED"`. Nothing in this section is half-done, so there is no
+merge hazard — it is all net-new files.
+
+**3. The `.gitattributes` argument is stronger than the section makes it
+sound.** `index.html` is **2,796 lines** and is the file every diff lands in. A
+single CRLF round-trip from the Windows working copy rewrites all of it, and
+the review cost falls entirely on the one file where review actually matters.
+Of the six "worth doing" items this is the cheapest and the one with a concrete
+failure mode already in reach.
+
+**4. The calibration issue form should mirror the fixture schema in A, not
+invent its own.** Section A already specifies `tests/data/<topic>-<car>-<date>.json`
+with `car / class / pi / date / screen / build / held / varied / rows`. If the
+form's fields are the same names in the same order, a filed report transcribes
+into a fixture mechanically. If they drift, every report needs re-keying by
+hand, which is how a report ends up staying a chat message.
 
 ---
 
@@ -599,17 +742,71 @@ fill the table. Step 3 with step 4 skipped is the thing to avoid.
 its matrix; the plan-mode hide list needs a decision too — layout is knowable
 before parts are bought, so it belongs in plan mode as well as tune mode.
 
+## Checked against the code, 2026-08-08
+
+**1. The migration hazard is worse than described, in two ways. Read this
+before renaming a key.**
+
+*`disc` is not only in `libKey` — it is a stored field value in all three
+stores.* `FIELDS` (`index.html:2312`) includes `disc`, and both `libAdd` and
+`planAdd` copy every entry in `FIELDS` onto the record. So "`planKey()` does
+not include `disc`, so the plan store is safe" is **wrong**: plan entries do not
+lose their key, but they carry a stale `disc` string that no longer exists in
+`DISC`.
+
+*And the failure is not a silent non-match.* Loading restores values into form
+controls with `el.value = v` (`:2381`). Assigning a `<select>` a value it does
+not have leaves it unselected — `value` reads `''` — so the build loads with no
+discipline. `compute()` opens with `const d = DISC[i.disc]` (`:961`), which is
+then `undefined` and throws on the first property access. Depending on which
+path the user took, a renamed key is therefore either a **crash** or a build
+that quietly comes back as a different discipline. Both are worse than an
+orphan, because an orphan is at least visibly missing.
+
+**2. There is a third localStorage key the plan does not account for.**
+`fh6last` (written `:2477`, read `:2316`) holds the last-entered form state and
+is restored on every load. It stores `FIELDS`, so it stores `disc` too. Any
+migration has to sweep `fh6lib`, `fh6plan` **and** `fh6last`, or the first page
+load after the rename restores a dead discipline into the form. The omission is
+inherited from CLAUDE.md, which describes "two localStorage-backed stores" —
+that count is of the *stores*, and `fh6last` is a session-restore, but for a
+key rename it is a third place the string lives.
+
+**3. The recommendation stands, and is now better supported: rename labels,
+leave keys.** `DISC[x].n` is presentation only. Given points 1 and 2, the key
+rename costs a three-store migration plus a version marker plus tests, to change
+strings nobody sees.
+
+**4. One correction to the table.** `cc`'s current label is `'Cross-Country'`
+with a hyphen (`index.html:519`), while the "should be" column writes
+"Cross Country" without one and calls the label already right. If the game's
+string has no hyphen, that is still a change — small, but this whole item is a
+transcription task, so transcribe it.
+
+**5. "Part of this is already built" is exactly five constants.** Road versus
+sprint in `DISC` (`:507–510`) differ only in: spring factors `fF` 1.00→0.98 and
+`fR` 0.97→0.95, decel `dec` 15→12, final-drive base `fd` 3.70→3.55, and `vFrac`
+1.00→1.03. Nothing else — same camber, same caster, same toe, same ride height.
+That is a useful sanity bound on the layout modifier: whatever circuit versus
+point-to-point turns out to be worth, it should be smaller than the road/sprint
+gap, and it lands on the same short list of constants the existing split
+already touches (springs, gearing, decel). It also matches the plan's own
+"what plausibly does differ" list, which is reassuring rather than
+circular — the two were derived independently.
+
 ---
 
 # E. Loose ends — small, found 2026-08-08, not fixed
 
-Two documentation defects found while auditing the repo. Neither breaks
-anything today; the second is a real contradiction in the reference data and
-should be settled before anyone leans on the gearing constant again.
+Four documentation defects found while auditing the repo (E1–E3 on 2026-08-08,
+E4 added the same day from the code check). None breaks anything today; E2 is a
+real contradiction in the reference data and should be settled before anyone
+leans on the gearing constant again, and E4 is the same species of defect in
+the provenance record.
 
 ### E1 — CLAUDE.md undercounts the test suite
 
-CLAUDE.md line 27 says "381+ assertions across thirteen files." Actual, as of
+CLAUDE.md line 33 says "381+ assertions across thirteen files." Actual, as of
 2026-08-08: **532 assertions across sixteen files** (`arb`, `find`, `gates`,
 `gearing`, `locked`, `modes`, `mono`, `pi`, `planyear`, `review2`, `scan`,
 `smoke2`, `smoke3`, `stock`, `stress`, `sweep`). Just stale — update the number
@@ -622,7 +819,7 @@ scepticism where it is not warranted.
 Same car, same screen, two different readings, and the whole gearing model
 hangs off it via `k = axisMax · fdFit · G_top`:
 
-- `sweep.test.js` — `const FIT = 4.575, AXIS = 157`, asserting k ≈ **589**.
+- `sweep.test.js:40` — `const FIT = 4.575, AXIS = 157`, asserting k ≈ **589**.
 - `gearing.test.js:177` — `const K = 159 * 4.575 * 0.82`, i.e. **596.5**.
 - CLAUDE.md uses both: the "no 7th gear visible" observation is on a 159 axis,
   while the 7th-gear-stub example says "6th ran out at 154 on a 157 chart."
@@ -642,13 +839,48 @@ car, but it is not established whether power upgrades move it. If the two
 readings were taken at different build states, both could be right and the real
 defect is that neither records the build. A4 should check that too.
 
+**Third wrinkle, found in the code check 2026-08-08:** the two files also
+disagree about where the *top gear ratio* comes from. `sweep.test.js` reads it
+from the app — `const K = AXIS * FIT * X.SPREAD[7][6]` (`:78`, `:91`) — while
+`gearing.test.js:177` hardcodes `0.82`. They agree today only because
+`SPREAD[7][6]` is 0.82. This makes E2 a prerequisite for **A3**, which replaces
+the `SPREAD` rows with measured ones: the moment that table moves,
+`sweep.test.js`'s constant moves with it and `gearing.test.js`'s does not, and
+the 1.3% disagreement stops being the only difference between them. Settle the
+axis, put `FIT`, `AXIS` and the top ratio in one dated fixture, and have both
+files import it.
+
 ### E3 — CLAUDE.md says the working directory has not been renamed. It has.
 
-Line 16: "The local working directory is still `Forza Tune Builder`; renaming
-it is safe but has to happen outside a session, since it is the cwd." The
-actual path is now `C:\Users\bston\Projects\forza-tune-goon`, so the rename
+Lines 15–17: "The local working directory is still `Forza Tune Builder`;
+renaming it is safe but has to happen outside a session, since it is the cwd."
+The actual path is now `C:\Users\bston\Projects\forza-tune-goon`, so the rename
 already happened and the caveat describes work that is done. Delete the
 sentence. Bundle it with E1 — both are one-line staleness in the same file.
+
+### E4 — The gating matrix cites a source CLAUDE.md says does not exist
+
+CLAUDE.md, on the gating matrix: "Audited 2026-07-31 at Boston's request:
+ForzaTune's guide does not cover part-to-slider unlocks at all, **and no other
+credible source exists.**"
+
+The comment above the gate block says the opposite — `index.html:1206–1207`:
+"Gating per the one traceable FH6 source (**Destructoid's slider guide**) plus
+FH5 carry-over."
+
+Destructoid appears nowhere in CLAUDE.md, and CLAUDE.md's tier list has no slot
+for it. So either the audit missed a source the code has been relying on since
+before it, or the comment is stale and the guide was checked and rejected —
+and which one it is changes A1's status. If Destructoid genuinely covers FH6
+part-to-slider unlocks, the matrix is tier 2 and A1 is a confirmation pass. If
+it does not, the matrix is tier 3/4 as CLAUDE.md says and A1 is the only thing
+standing between the app and a load-bearing guess.
+
+Fix: open the guide, decide which reading is right, and make the two files
+agree — either add it to CLAUDE.md's tier 2 list with what it actually covers,
+or delete the claim from the code comment. Ten minutes, no game needed. Do it
+before A1 rather than after, because it tells you whether A1 is checking a
+source or replacing one.
 
 ---
 
