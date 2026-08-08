@@ -414,6 +414,12 @@ when the tradeoff came up. When a claim can be verified against the actual
 game, that beats any external source, including prior research in this repo's
 history.
 
+**Git: commit straight to `main`.** Solo personal project — no branches, no
+PRs, no reviewers for routine work. Branch only if something genuinely gets
+complicated enough to need it. Clear commit messages, no process theatre; a
+one-line `.gitignore` change should not become a branch, a push, a PR and a
+merge. Open items live in `BACKLOG.md`, which is tracked, not ignored.
+
 ## Known gaps / honest limitations
 
 - No car database. Deliberate — there's no FH6 API and the one real stat

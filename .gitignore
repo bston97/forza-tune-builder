@@ -1,5 +1,12 @@
 node_modules/
 
-# Local planning notes — not part of the shipped project. Note this means it
-# does not sync anywhere; move it into the repo if that stops being fine.
-BACKLOG.md
+# Local machine config and secrets. There is no build step and no backend, so
+# there is no build output or env file today — these are here so that stays true
+# by accident-prevention rather than by luck.
+.env
+.env.*
+.claude/settings.local.json
+
+# OS junk
+.DS_Store
+Thumbs.db
