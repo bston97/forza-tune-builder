@@ -2,7 +2,7 @@
 
 This is the repo's to-do list. It is tracked and pushed like everything else
 (it was briefly gitignored on 2026-08-08 and that was reversed the same day —
-a to-do list that only exists on one machine is not a to-do list). Six items,
+a to-do list that only exists on one machine is not a to-do list). Seven items,
 each with a plan detailed enough to start from cold. Nothing here has been
 implemented.
 
@@ -29,10 +29,15 @@ menu, and they turn two of the biggest house-heuristic guesses into measured
 functions. D (discipline naming) next, because it is small and it changes the
 vocabulary every other plan is written in. Then B (generative test set),
 because it needs A's fixtures to be more than a structural check. C (GitHub
-files) is independent and can be done any time. F is library housekeeping
-rather than code and needs Boston at the wheel, so it runs on its own clock —
-though the shape of what it needs from the app (see F3) is worth knowing before
-D lands, since both touch how a build is keyed.
+files) is independent and can be done any time. F and G are library
+housekeeping rather than code and need Boston at the wheel, so they run on
+their own clock — though the shape of what F needs from the app (see F3) is
+worth knowing before D lands, since both touch how a build is keyed.
+
+**G3 before F, though.** G is the rule for which names mean "same car" and
+which mean "different car in the same family"; F's cull merges names. Culling
+an Evo VIII against an Evo X without that rule in hand deletes a real build
+and there is no undo.
 
 ---
 
@@ -961,3 +966,127 @@ Whether same-car-different-class/discipline entries read as duplicates to cull
 or as the keepers. F1 assumes keepers. If it turns out to be the opposite, the
 cull is much larger *and* F2's "two tunes" is rebuilding what was just deleted
 — so it is worth being sure of on the first car rather than the twentieth.
+
+**Do G3 before this.** The cull renames things, and G is about which names mean
+"same car" and which mean "different car in the same family." Culling first
+loses that distinction permanently.
+
+---
+
+# G. Nameplate families — many builds, never a "best"
+
+Asked for 2026-08-08, immediately after F. Notes only, nothing started.
+
+## G0 — What was asked
+
+Multiple custom builds for nameplates that have a lot of variants in the game,
+explicitly **not** reduced to a best-of. Named directly: Lancer Evolutions,
+Civics, the Subarus, the Nissans (GT-R generations and the 350Z), and on the
+muscle side Challenger, Mustang, Charger, Camaro, Corvette. "Evolutions and
+variants, stuff like those where there's a lot of them" — so this covers two
+things that behave the same way here: **generations** of one nameplate (Evo
+VIII / IX / X, C5 / C6 / C7 Corvette) and **trim variants** within a generation.
+
+## G1 — This is not F, and F is the thing most likely to destroy it
+
+F's cull includes a normalisation pass that merges name-variant collisions —
+"GR86" vs "Toyota GR86" vs "toyota gr86 " are three keys for one car and two of
+them are junk. **A family is indistinguishable from that pattern by string
+shape.** "Lancer Evolution VIII" and "Lancer Evolution X" share a long prefix
+and differ by a short suffix, which is exactly what a typo pair looks like. Run
+the cull without a family rule and it eats real cars, irreversibly
+(localStorage, one device, no undo).
+
+Two rules that fall straight out of this, and they invert F's:
+
+1. **Inside a family, the year field is a discriminator and never gets
+   dropped.** F1 calls year variants junk — same car saved once with the year
+   and once without. That is true *between* duplicates of one car and false
+   *within* a family, where the year is often the only thing separating two
+   entries whose names differ by a Roman numeral.
+2. **A suffix difference is a different car until proven otherwise.** Junk
+   collisions differ by manufacturer prefix, spacing or case. Genuine variants
+   differ by generation marker. When in doubt, keep both — the cost of keeping
+   a duplicate is a row in a list; the cost of dropping a variant is a build.
+
+## G2 — The app already does this right, and the work is mostly not regressing it
+
+Two mechanisms exist and neither picks a best:
+
+**Find groups families for free.** The match is a substring test on the name —
+`String(b.name||'').toLowerCase().includes(q)` (`index.html:2420`) — so typing
+`lancer` already returns every Lancer, `corvette` every Corvette. There is no
+family feature to build; there is a naming convention to settle (G3). The
+autocomplete is fed the same way and sorts alphabetically (`refreshCarList`,
+`:2403`), so consistently-named variants already cluster.
+
+**The build plan's reference list is deliberately unranked.** `peers` is
+`libLoad().filter(b => b.cls===i.cls && b.disc===i.disc && b.hp && b.wt)`
+(`:821`), rendered as the last five in insertion order, under the heading
+"Your finished \<class\> \<discipline\> builds for reference" with the
+parenthetical **"(your own data, not a rule)"** (`:1571–1575`). Nothing sorts
+it, nothing scores it, nothing calls one better. That parenthetical is the
+whole no-best-picking policy, already shipped in four words. Do not remove it,
+and do not add an `ORDER BY` to that list.
+
+So the deliverable here is much smaller than the ask sounds: a naming
+convention, a rule written down, and a guard. No new feature is required, and
+that is the finding, not a dodge.
+
+## G3 — The naming convention (the actual work, and it is a decision not a task)
+
+`libKey` is `name|year|class|disc` and `name` is free text, so a family is only
+as real as the string typed into it. The convention needs to satisfy one test:
+**the family name must be a substring of every member.** That is what makes
+Find's existing behaviour do the grouping.
+
+Working proposal — family first, variant after, year always in the year field:
+
+- `Lancer Evolution VIII` / `Lancer Evolution IX` / `Lancer Evolution X` → all
+  match `lancer`
+- `Civic Type R` / `Civic Si` → both match `civic`
+- `Corvette C5` / `Corvette C6` / `Corvette C7` → all match `corvette`
+- `Camaro ZL1` / `Camaro Z28`, `Mustang GT` / `Mustang Boss 302`, and so on
+
+**The Nissans are the case that breaks it, and it needs deciding rather than
+guessing.** The R32/R33/R34 are Skyline GT-Rs and the R35 is just GT-R, so
+`gt-r` catches all four but `skyline` misses the R35 — while the 350Z shares no
+substring with any of them despite being the same manufacturer. Three options:
+treat GT-R as the family and accept Skyline as a variant prefix
+(`GT-R R34 Skyline`); treat them as two families; or accept that "the Nissans"
+is a garage grouping rather than a nameplate family and not force it. The third
+is probably right and it is Boston's call.
+
+**Recommendation: convention only, no schema change.** A `family` field in
+`libKey` would make grouping explicit, but it is a key change — which per D's
+findings means migrating `fh6lib`, `fh6plan` **and** `fh6last`, plus a version
+marker and tests. Substring Find already delivers the grouping at zero cost.
+Revisit the field only if the convention is tried and demonstrably fails.
+
+## G4 — Where "best" would creep back in, so it can be refused on sight
+
+None of these exist today. Each is a plausible-sounding future change that
+would break the thing this item is protecting:
+
+- Sorting `peers` by hp/1000 lb, PI, or anything else. It is insertion order on
+  purpose. Sorting a list is how a list becomes a ranking.
+- A "your best build in this class" line, or flagging the peer with the highest
+  power-to-weight. `carNotes()` already carries qualitative viability flags
+  (`:1475`) and describes the car in front of it — it never compares two cars,
+  and that boundary is the one to hold.
+- Applying F's "get rid of ones I don't want" per-family rather than per-entry.
+  The families in G0 are the ones where he wants *more* entries, not fewer.
+
+Rule to write into the code comment beside `peers` if that block is ever
+touched: **the app lists, it does not order.**
+
+## G5 — Open, needs Boston
+
+1. Which string is the family for the Nissans (G3), and whether "the Subarus"
+   means WRX/STI as one family or several.
+2. Whether the multiple builds per family differ by **class** (an A-class Evo
+   and an S1 Evo) or by **discipline**, or vary per family. F2 settled this at
+   the whole-library level as "discipline or class, decided per car" — a family
+   may well want the opposite emphasis, since the interesting comparison
+   between three Evos is more likely to be the same discipline at different
+   classes than the reverse.
