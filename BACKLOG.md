@@ -654,20 +654,22 @@ sentence. Bundle it with E1 — both are one-line staleness in the same file.
 
 # F. Library cull, then two tunes per keeper
 
-Asked for 2026-08-08, recorded as a note only — **nothing here has been
-started, and the shape below is one reading of a one-line request, not a
-settled spec.** Read F0 before acting on any of it.
+Asked for 2026-08-08, recorded as a note only. **Nothing here has been started
+and nothing should be — Boston is driving this one himself when he gets to it.**
+The value of the notes is the keying detail in F1 and the missing delete in F3,
+which are easy to not know at the moment you are staring at the list.
 
 ## F0 — What was actually said
 
 > "Go through all duplicates and get rid of ones I don't want and create 2
 > different tunes for each we actually like."
 
-Two jobs, in order: **cull, then double up.** Everything past this heading is
-inference about what "duplicates" and "2 different tunes" mean against how the
-stores are actually keyed. Confirm the two open questions in F4 with Boston
-before deleting anything — a delete here is unrecoverable (localStorage, one
-device, no backup, no undo).
+Two jobs, in order: **cull, then double up.** Asked whether the two tunes would
+differ on an axis the key already holds, he confirmed they will — so this is
+data entry, not a schema change (see F2). The rest is his call at the time.
+
+One thing worth knowing before the first delete regardless: it is
+unrecoverable. localStorage, one device, no backup, no undo.
 
 ## F1 — Why there are duplicates at all
 
@@ -694,20 +696,19 @@ judgement on 3 and 4.
 
 ## F2 — "Two different tunes for each we actually like"
 
-Best reading: for each car that survives the cull, have two saved builds that
-are meaningfully different, not two copies with a slider moved. The natural
-axis is the one the key already carries — **discipline** (e.g. a road build and
-a circuit build), which the app is already set up to hold side by side and
-which the build plan already reads as reference points. Second candidate axis
-is **class** (e.g. an A build and an S1 build of the same car). Needs Boston to
-pick; see F4.
+For each car that survives the cull, two saved builds that differ on
+**discipline or class** — the two axes `libKey` already carries, so they sit
+side by side with no code change and the build plan picks both up as reference
+points. Confirmed 2026-08-08 that this is the intent; which axis per car is
+whatever the car deserves, decided as he goes, not something to systematise up
+front.
 
-Note what this is *not*: it is not two variants of one tune, because
-`libKey` has no slot for a variant name — saving a second setup in the same
-car+year+class+discipline overwrites the first. If that is what he wants, this
-stops being a data-entry task and becomes a schema change (a `variant` field in
-the key, plus migration for every existing entry, plus `find.test.js` and
-`planyear.test.js` updates). Do not start that on a guess.
+Worth recording why the question was asked: `libKey` has no slot for a variant
+name, so two setups of the *same* car+year+class+discipline overwrite each
+other. That case would be a schema change (a `variant` field in the key,
+migration for every existing entry, `find.test.js` and `planyear.test.js`
+updates) — ruled out, but it is the thing to re-check if the ask ever comes
+back as "two setups for the same event."
 
 ## F3 — One real gap the cull will hit immediately
 
@@ -716,17 +717,15 @@ two-tap Delete (`index.html:1638`, handler at `:2743`); starting-point entries
 have no delete path at all — they are written by Build Plan, surfaced by Find,
 and then permanent. A cull that can only remove half the store is not a cull.
 
-Fix before starting: give plan rows the same two-tap Delete, addressed by
-`planKey`, filtering `planLoad()` and calling `planStore()` — a near-copy of
-the existing library handler. `find.test.js` covers the Find list that renders
-both, so extend it there. Small, and it is the only code this whole item needs
-under the F2 reading above.
+Fix: give plan rows the same two-tap Delete, addressed by `planKey`, filtering
+`planLoad()` and calling `planStore()` — a near-copy of the existing library
+handler. `find.test.js` covers the Find list that renders both, so extend it
+there. Small, and it is the only code this whole item needs. Do it when the
+cull starts, not before — there is no point having it sat there unused.
 
-## F4 — Open questions, blocking
+## F4 — The one thing to decide at the time
 
-1. **Which axis are the two tunes?** Discipline, class, or something the key
-   does not currently hold (which would make this a schema change, see F2).
-2. **Do same-car-different-class/discipline entries count as duplicates to
-   cull, or as the keepers?** F1 assumes keepers. If he means the opposite, the
-   cull is much larger and F2's "two tunes" is rebuilding what was just
-   deleted — which would be worth catching before, not after.
+Whether same-car-different-class/discipline entries read as duplicates to cull
+or as the keepers. F1 assumes keepers. If it turns out to be the opposite, the
+cull is much larger *and* F2's "two tunes" is rebuilding what was just deleted
+— so it is worth being sure of on the first car rather than the twentieth.
